@@ -34,12 +34,6 @@ class LeNetConvPoolLayer(object):
 		@poolsize: tuple/list. Shape of pooling kernel, of value: (pool_row, pool_col)
 		@act: Activation. Activation function used for each neuron.
 		'''
-		pprint('In LeNetConvPoolLayer, debugging')
-		pprint('Image shape: ')
-		pprint(image_shape)
-		pprint('Filter shape: ')
-		pprint(filter_shape)
-
 		assert filter_shape[1] == image_shape[1]
 		# Initialization according to a common trick	
 		fan_in = np.prod(filter_shape[1:])
@@ -51,17 +45,6 @@ class LeNetConvPoolLayer(object):
 					name='W', borrow=True)
 		self.b = theano.shared(value=np.zeros(filter_shape[0], dtype=floatX),
 					name='b', borrow=True)
-
-		pprint('Size of input: ')
-		pprint(input.ndim)
-		pprint('Size of W: ')
-		pprint(self.W.ndim)
-		pprint('Image shape: ')
-		pprint(image_shape)
-		pprint('Filter shape: ')
-		pprint(filter_shape)
-		pprint('=' * 50)
-
 		conv_out = conv.conv2d(input=input, filters=self.W, filter_shape=filter_shape, image_shape=image_shape)
 		pooled_out = downsample.max_pool_2d(conv_out, ds=poolsize, ignore_border=True)
 		self.output = act.activate(pooled_out + self.b.dimshuffle('x', 0, 'x', 'x'))

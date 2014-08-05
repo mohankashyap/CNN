@@ -35,6 +35,8 @@ class SoftmaxLayer(object):
 					name='W', borrow=True)
 		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b', borrow=True)
 		self.output = T.nnet.softmax(T.dot(self.W, self.input) + self.b)
+		# Stack parameters
+		self.params = [self.W, self.b]
 		# Prediction for classification
 		self.pred = T.argmax(self.output, axis=0)
 		# Stack parameter

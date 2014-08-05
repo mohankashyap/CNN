@@ -21,12 +21,7 @@ class TestCNN(unittest.TestCase):
 		self.configer = CNNConfiger(fname)
 
 	def testBuilding(self):
-		batch_size = 200
-		image_row, image_col = 28, 28
-		input = T.tensor4(name='input')
-		input.reshape((batch_size, 1, image_row, image_col))
-		truth = T.ivector()
-		convNet = ConvNet(input, truth, self.configer, verbose=True)
+		convNet = ConvNet(self.configer, verbose=True)
 
 
 if __name__ == '__main__':

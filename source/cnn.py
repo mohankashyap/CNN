@@ -10,10 +10,12 @@ import numpy as np
 import theano
 import theano.tensor as T
 import time
+import cPickle
 from pprint import pprint
 
 import config
 import utils
+from utils import floatX
 from convpool import LeNetConvPoolLayer
 from mlp import HiddenLayer
 from logistic import SoftmaxLayer
@@ -23,12 +25,14 @@ class ConvNet(object):
 	'''
 	Convolutional Neural Network based on the structure of Yann Lecun's work.
 	'''
-	def __init__(self, input=None, truth=None, configs=None, verbose=True):
+	def __init__(self, configs=None, verbose=True):
 		'''
 		@config: CNNConfiger. Configer used to set the architecture of CNN.
 		'''
 		if verbose: pprint("Building Convolutional Neural Network...")
-		self.input = input
+		# Make theano symbolic tensor for input and ground truth label
+		self.input = T.tensor4(name='input', dtype=floatX)
+		self.truth = T.ivector(name='label')
 		self.batch_size = configs.batch_size
 		self.image_row = configs.image_row
 		self.image_col = configs.image_col
@@ -64,7 +68,7 @@ class ConvNet(object):
 					image_shape=image_shapes[i], poolsize=configs.pools[i], act=self.act))
 		# Multilayer perceptron layers
 		for i in xrange(configs.num_mlp):
-			if i == 0: current_input = T.flatten(self.convpool_layers[configs.num_convpool-1].output)
+			if i == 0: current_input = T.flatten(self.convpool_layers[configs.num_convpool-1].output, 2)
 			else: current_input = self.mlp_layers[i-1].output
 			self.mlp_layers.append(HiddenLayer(current_input, configs.mlps[i], act=self.act))
 		# Softmax Layer, for most case, the architecture will only contain one softmax layer
@@ -73,9 +77,28 @@ class ConvNet(object):
 			else: current_input = self.softmax_layers[i-1].output
 			self.softmax_layers.append(SoftmaxLayer(current_input, configs.softmaxs[i]))
 		# Output
-		self.prediction = self.softmax_layers[configs.num_softmax-1].prediction()
+		self.pred = self.softmax_layers[configs.num_softmax-1].prediction()
 		# Cost function with ground truth provided
-		self.cost = self.softmax_layers[configs.num_softmax-1].NLL_loss(truth)
+		self.cost = self.softmax_layers[configs.num_softmax-1].NLL_loss(self.truth)
+		# Build cost function 
+		# Stack all the parameters
+		self.params = []
+		for convpool_layer in self.convpool_layers:
+			self.params.extend(convpool_layer.params)
+		for mlp_layer in self.mlp_layers:
+			self.params.extend(mlp_layer.params)
+		for softmax_layer in self.softmax_layers:
+			self.params.extend(softmax_layer.params)
+		# Compute gradient of self.cost with respect to network parameters
+		self.gradparams = T.grad(self.cost, self.params)
+		# Stochastic gradient descent learning algorithm
+		self.updates = []
+		for param, gradparam in zip(self.params, self.gradparams):
+			self.updates.append((param, param-configs.learning_rate*gradparam))
+		# Build objective function
+		self.objective = theano.function(inputs=[self.input, self.truth], outputs=self.cost, updates=self.updates)
+		# Build prediction function
+		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 		if verbose:
 			pprint('Architecture building finished, summarized as below: ')
 			pprint('There are %d layers (not including the input layer) algother: ' % (configs.num_convpool*2 + configs.num_mlp + configs.num_softmax))
@@ -100,6 +123,30 @@ class ConvNet(object):
 				pprint('Softmax Layer %d: ' % i)
 				pprint('Output dimension: %d, Input dimension: %d' % (configs.softmaxs[i][0], configs.softmaxs[i][1]))
 
-	def train(self):
-		pass
+	def train(self, minibatch, label):
+		'''
+		@minibatch: np.ndarray. 4th order tensor of input data, should be of type floatX.
+		@label: np.ndarray. 1 dimensional array of int as labels.
+		'''
+		cost = self.objective(minibatch, label)
+		pred = self.predict(minibatch)
+		accuracy = (pred == label) / label.shape[0]
+		return cost, accuracy
+
+	@staticmethod
+	def save(fname, model):
+		'''
+		Store current model to file
+		'''
+		with file(fname, 'wb') as fout:
+			cPickle.dump(model, fout)
+
+	@staticmethod
+	def load(fname):
+		'''
+		Recover model from file
+		'''
+		with file(fname, 'rb') as fin:
+			model = cPickle(fin)
+			return model
 

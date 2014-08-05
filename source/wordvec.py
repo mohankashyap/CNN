@@ -54,8 +54,3 @@ class WordEmbedding(object):
 		except KeyError:
 			pass
 		return self._embedding[idx]
-
-
-
-
-

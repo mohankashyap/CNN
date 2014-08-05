@@ -35,7 +35,7 @@ class HiddenLayer(object):
 		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b', borrow=True)
 		self.output = act.activate(T.dot(self.W, self.input) + self.b)
 		# Stack parameters
-		self.param = [self.W, self.b]
+		self.params = [self.W, self.b]
 
 	def L2_loss(self):
 		return T.sum(self.W ** 2)
