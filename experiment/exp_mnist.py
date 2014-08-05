@@ -62,10 +62,12 @@ for i in xrange(nepoch):
 		pprint('Epoch %d, batch %d, cost = %f, accuracy = %f' % (i, j, cost, accuracy))
 	ConvNet.save('./mnist.cnn', convnet)
 end_time = time.time()
-pprint('Time used to train CNN on MNIST: %f minutes' % (end_time-start_time) / 60)
-
-
-
+pprint('Time used to train CNN on MNIST: %f minutes' % ((end_time-start_time) / 60))
+# Test accuracy
+test_set = test_set.reshape((test_size, 1, image_row, image_col))
+prediction = convnet.predict(test_set)
+test_accuracy = np.sum(prediction == test_label) / float(test_label.shape[0])
+pprint('Test set accuracy: %f' % test_accuracy)
 
 
 
