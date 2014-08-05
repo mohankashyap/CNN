@@ -30,10 +30,10 @@ class HiddenLayer(object):
 		self.W = theano.shared(value=np.asarray(
 					np.random.uniform(low=-np.sqrt(6.0/(fan_in+fan_out)),
 									  high=np.sqrt(6.0/(fan_in+fan_out)),
-									  size=(num_out, num_in)), dtype=floatX),
+									  size=(num_in, num_out)), dtype=floatX),
 					name='W', borrow=True)
 		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b', borrow=True)
-		self.output = act.activate(T.dot(self.W, self.input) + self.b)
+		self.output = act.activate(T.dot(self.input, self.W) + self.b)
 		# Stack parameters
 		self.params = [self.W, self.b]
 

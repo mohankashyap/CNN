@@ -33,11 +33,14 @@ training_label = np.hstack((tr[1], va[1]))
 test_set, test_label = te[0], te[1]
 training_size = training_set.shape[0]
 test_size = test_set.shape[0]
+# Convert data type into int32
+training_label = training_label.astype(np.int32)
+test_label = test_label.astype(np.int32)
 # Check
 pprint('Dimension of Training data set: (%d, %d)' % training_set.shape)
 pprint('Dimension of Test data set: (%d, %d)' % test_set.shape)
 # Shuffle
-train_rand_shuffle = np.random.permutation(train_size)
+train_rand_shuffle = np.random.permutation(training_size)
 test_rand_shuffle = np.random.permutation(test_size)
 training_set = training_set[train_rand_shuffle, :]
 training_label = training_label[train_rand_shuffle]
@@ -45,12 +48,15 @@ test_set = test_set[test_rand_shuffle, :]
 test_label = test_label[test_rand_shuffle]
 # Partition data based on batch size
 batch_size = configer.batch_size
+image_row = configer.image_row
+image_col = configer.image_col
 nepoch = configer.nepoch
 num_batches = training_size / batch_size
 start_time = time.time()
 for i in xrange(nepoch):
 	for j in xrange(num_batches):
 		minibatch = training_set[j*batch_size : (j+1)*batch_size, :]
+		minibatch = minibatch.reshape((batch_size, 1, image_row, image_col))
 		label = training_label[j*batch_size : (j+1)*batch_size]
 		cost, accuracy = convnet.train(minibatch, label)
 		pprint('Epoch %d, batch %d, cost = %f, accuracy = %f' % (i, j, cost, accuracy))

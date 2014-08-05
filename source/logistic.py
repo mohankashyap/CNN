@@ -31,14 +31,14 @@ class SoftmaxLayer(object):
 		self.W = theano.shared(value=np.asarray(
 					np.random.uniform(low=-np.sqrt(6.0/(fan_in+fan_out)),
 									  high=np.sqrt(6.0/(fan_in+fan_out)),
-									  size=(num_out, num_in)), dtype=floatX),
+									  size=(num_in, num_out)), dtype=floatX),
 					name='W', borrow=True)
 		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b', borrow=True)
-		self.output = T.nnet.softmax(T.dot(self.W, self.input) + self.b)
+		self.output = T.nnet.softmax(T.dot(self.input, self.W) + self.b)
 		# Stack parameters
 		self.params = [self.W, self.b]
 		# Prediction for classification
-		self.pred = T.argmax(self.output, axis=0)
+		self.pred = T.argmax(self.output, axis=1)
 		# Stack parameter
 
 	def NLL_loss(self, ground_truth):

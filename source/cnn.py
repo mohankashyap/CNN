@@ -116,12 +116,12 @@ class ConvNet(object):
 			pprint('Hidden layers: ')
 			for i in xrange(len(self.mlp_layers)):
 				pprint('Hidden Layer %d: ' % i)
-				pprint('Output dimension: %d, Input dimension: %d' % (configs.mlps[i][0], configs.mlps[i][1]))
+				pprint('Input dimension: %d, Output dimension: %d' % (configs.mlps[i][0], configs.mlps[i][1]))
 			pprint('-' * 50)
 			pprint('Softmax layers: ')
 			for i in xrange(len(self.softmax_layers)):
 				pprint('Softmax Layer %d: ' % i)
-				pprint('Output dimension: %d, Input dimension: %d' % (configs.softmaxs[i][0], configs.softmaxs[i][1]))
+				pprint('Input dimension: %d, Output dimension: %d' % (configs.softmaxs[i][0], configs.softmaxs[i][1]))
 
 	def train(self, minibatch, label):
 		'''
@@ -130,7 +130,7 @@ class ConvNet(object):
 		'''
 		cost = self.objective(minibatch, label)
 		pred = self.predict(minibatch)
-		accuracy = (pred == label) / label.shape[0]
+		accuracy = np.sum(pred == label) / float(label.shape[0])
 		return cost, accuracy
 
 	@staticmethod
