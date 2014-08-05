@@ -1,3 +1,4 @@
 data/*
 source/*.pyc
 test/*.pyc
+experiment/*.pyc
