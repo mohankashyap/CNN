@@ -11,7 +11,6 @@ import time
 from pprint import pprint
 import numpy as np
 sys.path.append('../source/')
-
 from cnn import ConvNet
 from config import CNNConfiger
 

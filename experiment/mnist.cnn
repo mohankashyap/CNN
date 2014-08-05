@@ -89,7 +89,7 @@ p38
 (lp39
 (S'exp_mnist.py'
 p40
-I24
+I23
 S'<module>'
 p41
 S'convnet = ConvNet(configer, verbose=True)'
@@ -553,7 +553,7 @@ p192
 I01
 sS'_ConvOp__hashval'
 p193
-I-7965216691822399925
+I-7965216691821612702
 sbsbsg34
 I0
 sg35
@@ -2973,7 +2973,7 @@ g98
 sg192
 I01
 sg193
-I-7965216691822399885
+I-7965216691821612710
 sbsbsg34
 I0
 sg35
@@ -5118,7 +5118,7 @@ p1430
 g38
 (lp1432
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp1433
@@ -5976,7 +5976,7 @@ p1637
 g38
 (lp1639
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp1640
@@ -6049,7 +6049,7 @@ p1656
 g38
 (lp1658
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp1659
@@ -6500,7 +6500,7 @@ p1783
 g38
 (lp1785
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp1786
@@ -10779,7 +10779,7 @@ g98
 sg192
 I01
 sg193
-I-509551383348620997
+I-509551383348883950
 sbsbsg34
 I0
 sg35
@@ -12077,7 +12077,7 @@ g98
 sg192
 I00
 sg193
-I-7965216691822399565
+I-7965216691821612902
 sbsbsg34
 I0
 sg35
@@ -13146,7 +13146,7 @@ g98
 sg192
 I00
 sg193
-I-7965216691822399564
+I-7965216691821612899
 sbsbsg34
 I0
 sg35
@@ -22030,7 +22030,7 @@ p5779
 g38
 (lp5781
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp5782
@@ -22138,7 +22138,7 @@ p5806
 g38
 (lp5808
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp5809
@@ -22569,7 +22569,7 @@ p5919
 g38
 (lp5921
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp5922
@@ -22648,7 +22648,7 @@ p5938
 g38
 (lp5940
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp5941
@@ -23124,7 +23124,7 @@ p6061
 g38
 (lp6063
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6064
@@ -23206,7 +23206,7 @@ p6080
 g38
 (lp6082
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6083
@@ -23609,7 +23609,7 @@ p6183
 g38
 (lp6185
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6186
@@ -23688,7 +23688,7 @@ p6202
 g38
 (lp6204
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6205
@@ -24018,7 +24018,7 @@ p6285
 g38
 (lp6287
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6288
@@ -24098,7 +24098,7 @@ p6304
 g38
 (lp6306
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6307
@@ -24499,7 +24499,7 @@ p6407
 g38
 (lp6409
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6410
@@ -24578,7 +24578,7 @@ p6426
 g38
 (lp6428
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6429
@@ -24908,7 +24908,7 @@ p6509
 g38
 (lp6511
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6512
@@ -24988,7 +24988,7 @@ p6528
 g38
 (lp6530
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6531
@@ -25389,7 +25389,7 @@ p6631
 g38
 (lp6633
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6634
@@ -25468,7 +25468,7 @@ p6650
 g38
 (lp6652
 (g40
-I24
+I23
 g41
 S'convnet = ConvNet(configer, verbose=True)'
 tp6653
