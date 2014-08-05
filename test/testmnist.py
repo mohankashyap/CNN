@@ -6,15 +6,23 @@
 # @Version : 0.0
 
 import os, sys
-sys.path.add('../source/')
+sys.path.append('../source/')
 import cPickle
 import unittest
 from pprint import pprint
 
-class TestMNIST(object):
+class TestMNIST(unittest.TestCase):
 	def setUp(self):
 		fname = '../data/mnist.pkl'
-		self.train_set, self.valid_set, self.test_set = cPickle.load(fname)
-		pprint("Size of Training set: %d" % len(self.train_set))
-		pprint("Size of Validation set: %d" % len(self.valid_set))
-		pprint("Size of Test set: ")
+		fin = file(fname, 'rb')
+		self.train_set, self.valid_set, self.test_set = cPickle.load(fin)
+		fin.close()
+
+	def testData(self):
+		pprint("Size of Training set: %d" % len(self.train_set[0]))
+		pprint("Size of Validation set: %d" % len(self.valid_set[0]))
+		pprint("Size of Test set: %d" % len(self.test_set[0]))
+
+
+if __name__ == '__main__':
+	unittest.main()

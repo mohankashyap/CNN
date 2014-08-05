@@ -19,7 +19,7 @@ class CNNConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.learning_rate, self.batch_size, self.image_row, self.image_col, \
+		self.activation, self.learning_rate, self.nepoch, self.batch_size, self.image_row, self.image_col, \
 		self.num_convpool, self.num_mlp, self.num_softmax, self.convs, self.pools, self.mlps, \
 		self.softmaxs = self.parse()
 
@@ -33,6 +33,7 @@ class CNNConfiger(object):
 	def parse(self):
 		activation = self._cf_parser.get('functions', 'activations')
 		learning_rate = self._cf_parser.getfloat('parameters', 'learnrate')
+		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		batch_size = self._cf_parser.getint('input', 'batchsize')
 		image_row = self._cf_parser.getint('input', 'imagerow')
 		image_col = self._cf_parser.getint('input', 'imagecol')
@@ -62,9 +63,8 @@ class CNNConfiger(object):
 			l = [int(x) for x in l.split(',')]
 			softmaxs.append(l)
 
-		return (activation, learning_rate, batch_size, image_row, image_col, 
-				num_convpool, num_mlp, num_softmax,
-				convs, pools, mlps, softmaxs)
+		return (activation, learning_rate, nepoch, batch_size, image_row, image_col, 
+				num_convpool, num_mlp, num_softmax, convs, pools, mlps, softmaxs)
 
 
 

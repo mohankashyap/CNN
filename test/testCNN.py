@@ -20,9 +20,10 @@ class TestCNN(unittest.TestCase):
 		fname = '../mnist.conf'
 		self.configer = CNNConfiger(fname)
 
+	@unittest.skip('Passed successfully')
 	def testBuilding(self):
+		# Try to build CNN without actually running the algorithm
 		convNet = ConvNet(self.configer, verbose=True)
-
 
 if __name__ == '__main__':
 	unittest.main()
