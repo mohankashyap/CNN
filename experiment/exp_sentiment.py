@@ -8,14 +8,19 @@
 import os, sys
 import cPickle
 import unittest
+import time
 sys.path.append('../source/')
 from pprint import pprint
+import theano
+import theano.tensor as T
+import numpy as np
 
 from utils import floatX
 from cnn import ConvNet
 from logistic import SoftmaxLayer
 from mlp import MLP
 from wordvec import WordEmbedding
+from config import CNNConfiger, MLPConfiger
 
 class TestSentiment(unittest.TestCase):
 	def setUp(self):
@@ -51,14 +56,14 @@ class TestSentiment(unittest.TestCase):
 		for i, sent in enumerate(senti_train_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			pprint('Trainging set, Number of words in sentence %d: %d' % (i, len(words)))
+			# pprint('Trainging set, Number of words in sentence %d: %d' % (i, len(words)))
 			vectors = np.asarray([word_embedding.wordvec(word) for word in words])
 			self.senti_train_set[i, :] = np.mean(vectors, axis=0)
 		# Embedding for test set
 		for i, sent in enumerate(senti_test_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			pprint('Test set, Number of words in sentence %d: %d' % (i, len(words)))
+			# pprint('Test set, Number of words in sentence %d: %d' % (i, len(words)))
 			vectors = np.asarray([word_embedding.wordvec(word) for word in words])
 			self.senti_test_set[i, :] = np.mean(vectors, axis=0)
 		# Shuffle training and test data set
@@ -68,25 +73,118 @@ class TestSentiment(unittest.TestCase):
 		self.senti_test_set = self.senti_test_set[test_rand_index, :]
 		self.senti_train_label = self.senti_train_label[train_rand_index]
 		self.senti_test_label = self.senti_test_label[test_rand_index]
+		# Store data
+		self.train_size = train_size
+		self.test_size = test_size
 
+	@unittest.skip('Without sparsity constraint: accuracy = 0.70717 \
+					With sparsity constraint: accuracy = 0.706623')
 	def testSoftmax(self):
-		pass
+		'''
+		Sentiment analysis task for sentence representation using 
+		softmax classifier.
+		'''
+		input = T.matrix(name='input')
+		label = T.ivector(name='label')
+		learning_rate = T.scalar(name='learning rate')
+		num_in, num_out = 50, 2
+		softmax = SoftmaxLayer(input, (num_in, num_out))
+		lambdas = 1e-5
+		cost = softmax.NLL_loss(label) + lambdas * softmax.L2_loss()
+		# cost = softmax.NLL_loss(label)
+		params = softmax.params
+		gradparams = T.grad(cost, params)
+		updates = []
+		for param, gradparam in zip(params, gradparams):
+			updates.append((param, param-learning_rate*gradparam))
+		objective = theano.function(inputs=[input, label, learning_rate], outputs=cost, updates=updates)
+		# Training
+		nepoch = 5000
+		start_time = time.time() 
+		for i in xrange(nepoch):
+			rate = 2.0 / ((1.0 + i/500) ** 2)
+			func_value = objective(self.senti_train_set, self.senti_train_label, rate)
+			prediction = softmax.predict(self.senti_train_set)
+			accuracy = np.sum(prediction == self.senti_train_label) / float(self.train_size)
+			pprint('epoch %d, cost = %f, accuracy = %f' % (i, func_value, accuracy))
+		end_time = time.time()
+		pprint('Time used to train the softmax classifier: %f minutes' % ((end_time-start_time)/60))
+		# Test
+		prediction = softmax.predict(self.senti_test_set)
+		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
 
+	@unittest.skip('accuracy @ sigmoid = 0.7099 \
+					accuracy @ tanh = 0.7104 \
+					accuracy @ ReLU = 0.715380')
 	def testMLP(self):
-		pass
+		'''
+		Sentiment analysis task for sentence representation using MLP, 
+		with one hidden layer and one softmax layer.
+		'''
+		conf_filename = './sentiment_mlp.conf'
+		start_time = time.time()
+		configer = MLPConfiger(conf_filename)
+		mlpnet = MLP(configer, verbose=True)
+		end_time = time.time()
+		pprint('Time used to build the architecture of MLP: %f seconds.' % (end_time-start_time))
+		# Training
+		start_time = time.time()
+		for i in xrange(configer.nepoch):
+			cost, accuracy = mlpnet.train(self.senti_train_set, self.senti_train_label)
+			pprint('epoch %d, cost = %f, accuracy = %f' % (i, cost, accuracy))
+		end_time = time.time()
+		pprint('Time used for training MLP network on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
+		# Test
+		prediction = mlpnet.predict(self.senti_test_set)
+		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
 
+	# @unittest.skip('Wait for testing.')
+	# accuracy @ sigmoid = 0.7104
+	# accuracy @ tanh = 0.7159
 	def testCNN(self):
-		pass
+		conf_filename = './sentiment_cnn.conf'
+		# Build the architecture of CNN
+		start_time = time.time()
+		configer = CNNConfiger(conf_filename)
+		convnet = ConvNet(configer, verbose=True)
+		end_time = time.time()
+		pprint('Time used to build the architecture of CNN: %f seconds' % (end_time-start_time))
+		# Training
+		learn_rate = 0.5
+		batch_size = configer.batch_size
+		num_batches = self.train_size / batch_size
+		start_time = time.time()
+		for i in xrange(configer.nepoch):
+			right_count = 0
+			rate = learn_rate / ((i/100+1) ** 2)
+			for j in xrange(num_batches):
+				minibatch = self.senti_train_set[j*batch_size : (j+1)*batch_size, :]
+				minibatch = minibatch.reshape((batch_size, 1, configer.image_row, configer.image_col))
+				label = self.senti_train_label[j*batch_size : (j+1)*batch_size]
+				cost, accuracy = convnet.train(minibatch, label, rate)
+				prediction = convnet.predict(minibatch)
+				right_count += np.sum(label == prediction)
+				# pprint('Epoch %d, batch %d, cost = %f, local accuracy: %f' % (i, j, cost, accuracy))
+			accuracy = right_count / float(self.train_size)
+			pprint('Epoch %d, overall accuracy: %f' % (i, accuracy))
+			ConvNet.save('./sentiment.cnn', convnet)
+		end_time = time.time()
+		pprint('Time used to train CNN on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
+		# Test
+		num_batches = self.test_size / batch_size
+		right_count = 0
+		for i in xrange(num_batches):
+			minibatch = self.senti_test_set[i*batch_size : (i+1)*batch_size, :]
+			minibatch = minibatch.reshape((batch_size, 1, configer.image_row, configer.image_col))
+			label = self.senti_test_label[i*batch_size : (i+1)*batch_size]
+			prediction = convnet.predict(minibatch)
+			right_count += np.sum(prediction == label)
+		test_accuracy = right_count / float(self.test_size)
+		pprint('Test set accuracy: %f' % test_accuracy)
 
-	
-
-
-
-
-
-
-
-
-
+if __name__ == '__main__':
+	unittest.main()
 
 

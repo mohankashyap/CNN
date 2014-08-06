@@ -56,6 +56,7 @@ class MLP(object):
 		if verbose: pprint('Building Multilayer Perceptron...')
 		self.input = T.matrix(name='input', dtype=floatX)
 		self.truth = T.ivector(name='label')
+		self.learn_rate = T.scalar(name='learn rate')
 		self.batch_size = configs.batch_size
 		# There may have multiple hidden layers and softmax layers
 		self.hidden_layers = []
@@ -97,9 +98,9 @@ class MLP(object):
 		# Stochastic gradient descent
 		self.updates = []
 		for param, gradparam in zip(self.params, self.gradparams):
-			self.updates.append((param, param-configs.learning_rate*gradparam))
+			self.updates.append((param, param-self.learn_rate*gradparam))
 		# Build objective funciton
-		self.objective = theano.function(inputs=[self.input, self.truth], outputs=self.cost, updates=self.updates)
+		self.objective = theano.function(inputs=[self.input, self.truth, self.learn_rate], outputs=self.cost, updates=self.updates)
 		# Build prediction function
 		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 		if verbose:
@@ -118,12 +119,12 @@ class MLP(object):
 				pprint('Softmax Layer: %d' % i)
 				pprint('Input dimension: %d, Output dimension: %d' % (configs.softmaxs[i][0], configs.softmaxs[i][1]))
 
-	def train(self, batch, label):
+	def train(self, batch, label, learn_rate):
 		'''
 		@batch: np.ndarray. Training matrix with each row as an instance.
 		@label: np.ndarray. 1 dimensional array of int as labels.
 		'''
-		cost = self.objective(batch, label)
+		cost = self.objective(batch, label, learn_rate)
 		pred = self.predict(batch)
 		accuracy = np.sum(pred == label) / float(label.shape[0])
 		return cost, accuracy

@@ -19,7 +19,7 @@ class CNNConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.learning_rate, self.nepoch, self.batch_size, self.image_row, self.image_col, \
+		self.activation, self.nepoch, self.batch_size, self.image_row, self.image_col, \
 		self.num_convpool, self.num_mlp, self.num_softmax, self.convs, self.pools, self.mlps, \
 		self.softmaxs = self.parse()
 
@@ -32,7 +32,6 @@ class CNNConfiger(object):
 
 	def parse(self):
 		activation = self._cf_parser.get('functions', 'activations')
-		learning_rate = self._cf_parser.getfloat('parameters', 'learnrate')
 		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		batch_size = self._cf_parser.getint('input', 'batchsize')
 		image_row = self._cf_parser.getint('input', 'imagerow')
@@ -63,7 +62,7 @@ class CNNConfiger(object):
 			l = [int(x) for x in l.split(',')]
 			softmaxs.append(l)
 
-		return (activation, learning_rate, nepoch, batch_size, image_row, image_col, 
+		return (activation, nepoch, batch_size, image_row, image_col, 
 				num_convpool, num_mlp, num_softmax, convs, pools, mlps, softmaxs)
 
 
@@ -78,7 +77,7 @@ class MLPConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.learning_rate, self.nepoch, self.batch_size, self.sparsity, \
+		self.activation, self.nepoch, self.batch_size, self.sparsity, \
 		self.lambda1, self.lambda2, self.num_hidden, self.num_softmax, \
 		self.hiddens, self.softmaxs = self.parse()
 
@@ -91,7 +90,6 @@ class MLPConfiger(object):
 
 	def parse(self):
 		activation = self._cf_parser.get('functions', 'activations')
-		learning_rate = self._cf_parser.getfloat('parameters', 'learnrate')
 		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		batch_size = self._cf_parser.getint('input', 'batchsize')
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
@@ -113,6 +111,6 @@ class MLPConfiger(object):
 			l = [int(x) for x in l.split(',')]
 			softmaxs.append(l)
 
-		return (activation, learning_rate, nepoch, batch_size, sparsity,
+		return (activation, nepoch, batch_size, sparsity,
 				lambda1, lambda2, num_hidden, num_softmax, hiddens, softmaxs)
 

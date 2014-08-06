@@ -33,6 +33,7 @@ class ConvNet(object):
 		# Make theano symbolic tensor for input and ground truth label
 		self.input = T.tensor4(name='input', dtype=floatX)
 		self.truth = T.ivector(name='label')
+		self.learn_rate = T.scalar(name='learn rate')
 		self.batch_size = configs.batch_size
 		self.image_row = configs.image_row
 		self.image_col = configs.image_col
@@ -94,9 +95,9 @@ class ConvNet(object):
 		# Stochastic gradient descent learning algorithm
 		self.updates = []
 		for param, gradparam in zip(self.params, self.gradparams):
-			self.updates.append((param, param-configs.learning_rate*gradparam))
+			self.updates.append((param, param-self.learn_rate*gradparam))
 		# Build objective function
-		self.objective = theano.function(inputs=[self.input, self.truth], outputs=self.cost, updates=self.updates)
+		self.objective = theano.function(inputs=[self.input, self.truth, self.learn_rate], outputs=self.cost, updates=self.updates)
 		# Build prediction function
 		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 		if verbose:
@@ -123,12 +124,12 @@ class ConvNet(object):
 				pprint('Softmax Layer %d: ' % i)
 				pprint('Input dimension: %d, Output dimension: %d' % (configs.softmaxs[i][0], configs.softmaxs[i][1]))
 
-	def train(self, minibatch, label):
+	def train(self, minibatch, label, learn_rate):
 		'''
 		@minibatch: np.ndarray. 4th order tensor of input data, should be of type floatX.
 		@label: np.ndarray. 1 dimensional array of int as labels.
 		'''
-		cost = self.objective(minibatch, label)
+		cost = self.objective(minibatch, label, learn_rate)
 		pred = self.predict(minibatch)
 		accuracy = np.sum(pred == label) / float(label.shape[0])
 		return cost, accuracy
