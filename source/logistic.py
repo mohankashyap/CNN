@@ -39,7 +39,7 @@ class SoftmaxLayer(object):
 		self.params = [self.W, self.b]
 		# Prediction for classification
 		self.pred = T.argmax(self.output, axis=1)
-		# Stack parameter
+		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 
 	def NLL_loss(self, ground_truth):
 		'''
