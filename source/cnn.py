@@ -101,7 +101,7 @@ class ConvNet(object):
 		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 		if verbose:
 			pprint('Architecture building finished, summarized as below: ')
-			pprint('There are %d layers (not including the input layer) algother: ' % (configs.num_convpool*2 + configs.num_mlp + configs.num_softmax))
+			pprint('There are %d layers (not including the input layer) algether: ' % (configs.num_convpool*2 + configs.num_mlp + configs.num_softmax))
 			pprint('%d convolution layers + %d maxpooling layers.' % (len(self.convpool_layers), len(self.convpool_layers)))
 			pprint('%d fully connected layers.' % (len(self.mlp_layers)))
 			pprint('%d softmax layers.' % (len(self.softmax_layers)))

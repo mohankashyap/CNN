@@ -67,4 +67,52 @@ class CNNConfiger(object):
 				num_convpool, num_mlp, num_softmax, convs, pools, mlps, softmaxs)
 
 
+class MLPConfiger(object):
+	'''
+	Class for the configuration of the architecture of MLP.
+	'''
+	def __init__(self, fname):
+		'''
+		@fname: String. File path to the configuration file of MLP.
+		'''
+		self._cf_parser = ConfigParser.ConfigParser()
+		self._cf_parser.read(fname)
+		# Parsing 
+		self.activation, self.learning_rate, self.nepoch, self.batch_size, self.sparsity, \
+		self.lambda1, self.lambda2, self.num_hidden, self.num_softmax, \
+		self.hiddens, self.softmaxs = self.parse()
+
+	def get(self, cfg_object, cfg_section):
+		'''
+		@cfg_object: String. Block title.
+		@cfg_section: String. Section title.
+		'''
+		return self._cf_parser.get(cfg_object, cfg_section)
+
+	def parse(self):
+		activation = self._cf_parser.get('functions', 'activations')
+		learning_rate = self._cf_parser.getfloat('parameters', 'learnrate')
+		nepoch = self._cf_parser.getint('parameters', 'nepoch')
+		batch_size = self._cf_parser.getint('input', 'batchsize')
+		num_hidden = self._cf_parser.getint('architectures', 'hidden')
+		num_softmax = self._cf_parser.getint('architectures', 'softmax')
+		
+		sparsity = self._cf_parser.getint('parameters', 'sparsity')
+		lambda1 = self._cf_parser.getfloat('parameters', 'lambda1')
+		lambda2 = self._cf_parser.getfloat('parameters', 'lambda2')
+		# Load architecture of convolution and pooling layers
+		hiddens, softmaxs = [], []
+		# Load detailed architecture for each layer
+		for i in xrange(num_hidden):
+			l = self._cf_parser.get('layers', 'hidden'+str(i+1))
+			l = [int(x) for x in l.split(',')]
+			hiddens.append(l)
+
+		for i in xrange(num_softmax):
+			l = self._cf_parser.get('layers', 'softmax'+str(i+1))
+			l = [int(x) for x in l.split(',')]
+			softmaxs.append(l)
+
+		return (activation, learning_rate, nepoch, batch_size, sparsity,
+				lambda1, lambda2, num_hidden, num_softmax, hiddens, softmaxs)
 
