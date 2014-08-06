@@ -12,64 +12,78 @@ from pprint import pprint
 import numpy as np
 sys.path.append('../source/')
 
+from utils import floatX
 from wordvec import WordEmbedding
-from cnn import ConvNet
-from config import CNNConfiger
+from mlp import MLP
+from config import MLPConfiger
 
 np.random.seed(42)
 snippet_train_set_filename = '../data/train_snip.txt'
 snippet_test_set_filename = '../data/test_snip.txt'
 snippet_train_label_filename = '../data/train_label.txt'
 snippet_test_label_filename = '../data/test_label.txt'
-conf_filename = './snippet.conf'
+conf_filename = './snippet_mlp.conf'
+embedding_filename = '../data/wiki_embeddings.txt'
 # Build architecture of CNN from the configuration file
 start_time = time.time()
-configer = CNNConfiger(conf_filename)
-convnet = ConvNet(configer, verbose=True)
+configer = MLPConfiger(conf_filename)
+mlpnet = MLP(configer, verbose=True)
 end_time = time.time()
-pprint('Time used to build the architecture of CNN: %f seconds' % (end_time-start_time))
+pprint('Time used to build the architecture of MLP: %f seconds' % (end_time-start_time))
+# Load wiki-embedding
+word_embedding = WordEmbedding(embedding_filename)
 # Load data and train via minibatch
-fin = file(mnist_filename, 'rb')
-tr, va, te = cPickle.load(fin)
-fin.close()
-training_set = np.vstack((tr[0], va[0]))
-training_label = np.hstack((tr[1], va[1]))
-test_set, test_label = te[0], te[1]
-training_size = training_set.shape[0]
-test_size = test_set.shape[0]
-# Convert data type into int32
-training_label = training_label.astype(np.int32)
-test_label = test_label.astype(np.int32)
-# Check
-pprint('Dimension of Training data set: (%d, %d)' % training_set.shape)
-pprint('Dimension of Test data set: (%d, %d)' % test_set.shape)
-# Shuffle
-train_rand_shuffle = np.random.permutation(training_size)
-test_rand_shuffle = np.random.permutation(test_size)
-training_set = training_set[train_rand_shuffle, :]
-training_label = training_label[train_rand_shuffle]
-test_set = test_set[test_rand_shuffle, :]
-test_label = test_label[test_rand_shuffle]
-# Partition data based on batch size
-batch_size = configer.batch_size
-image_row = configer.image_row
-image_col = configer.image_col
-nepoch = configer.nepoch
-num_batches = training_size / batch_size
+with file(snippet_train_set_filename, 'rb') as fin:
+	snippet_train_txt = fin.readlines()
+with file(snippet_test_set_filename, 'rb') as fin:
+	snippet_test_txt = fin.readlines()
+snippet_train_label = np.loadtxt(snippet_train_label_filename, dtype=np.int32)
+snippet_test_label = np.loadtxt(snippet_test_label_filename, dtype=np.int32)
+training_size = len(snippet_train_txt)
+test_size = len(snippet_test_txt)
+# Check size:
+pprint('Training size: %d' % training_size)
+pprint('Test size: %d' % test_size)
+assert training_size == snippet_train_label.shape[0]
+assert test_size == snippet_test_label.shape[0]
+# Word embedding
+snippet_train_set = np.zeros((training_size, word_embedding.embedding_dim()), dtype=floatX)
+snippet_test_set = np.zeros((test_size, word_embedding.embedding_dim()), dtype=floatX)
+
+for i, snippet in enumerate(snippet_train_txt):
+	words = snippet.split()
+	vectors = np.asarray([word_embedding.wordvec(word) for word in words], dtype=floatX)
+	snippet_train_set[i, :] = np.mean(vectors, axis=0)
+
+for i, snippet in enumerate(snippet_test_txt):
+	words = snippet.split()
+	vectors = np.asarray([word_embedding.wordvec(word) for word in words], dtype=floatX)
+	snippet_test_set[i, :] = np.mean(vectors, axis=0)
+# Shuffle training and test data set
+train_rand_index = np.random.permutation(training_size)
+test_rand_index = np.random.permutation(test_size)
+snippet_train_set = snippet_train_set[train_rand_index, :]
+snippet_train_label = snippet_train_label[train_rand_index]
+snippet_test_set = snippet_test_set[test_rand_index, :]
+snippet_test_label = snippet_test_label[test_rand_index]
+# Decrease 1 from label
+snippet_train_label -= 1
+snippet_test_label -= 1
+# Training
 start_time = time.time()
-for i in xrange(nepoch):
-	for j in xrange(num_batches):
-		minibatch = training_set[j*batch_size : (j+1)*batch_size, :]
-		minibatch = minibatch.reshape((batch_size, 1, image_row, image_col))
-		label = training_label[j*batch_size : (j+1)*batch_size]
-		cost, accuracy = convnet.train(minibatch, label)
-		pprint('Epoch %d, batch %d, cost = %f, accuracy = %f' % (i, j, cost, accuracy))
-	ConvNet.save('./mnist.cnn', convnet)
+for i in xrange(configer.nepoch):
+	cost, accuracy = mlpnet.train(snippet_train_set, snippet_train_label)
+	pprint('epoch %d, cost = %f, accuracy = %f' % (i, cost, accuracy))
 end_time = time.time()
-pprint('Time used to train CNN on MNIST: %f minutes' % ((end_time-start_time) / 60))
-# Test accuracy
-test_set = test_set.reshape((test_size, 1, image_row, image_col))
-prediction = convnet.predict(test_set)
-test_accuracy = np.sum(prediction == test_label) / float(test_label.shape[0])
-pprint('Test set accuracy: %f' % test_accuracy)
+pprint('Time used for training MLP network on Snippet task: %f minutes' % ((end_time-start_time)/60))
+# Test
+prediction = mlpnet.predict(snippet_test_set)
+accuracy = np.sum(prediction == snippet_test_label) / float(test_size)
+pprint('Test accuracy: %f' % accuracy)
+
+
+
+
+
+
 
