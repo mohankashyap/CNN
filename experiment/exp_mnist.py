@@ -63,9 +63,15 @@ for i in xrange(nepoch):
 end_time = time.time()
 pprint('Time used to train CNN on MNIST: %f minutes' % ((end_time-start_time) / 60))
 # Test accuracy
-test_set = test_set.reshape((test_size, 1, image_row, image_col))
-prediction = convnet.predict(test_set)
-test_accuracy = np.sum(prediction == test_label) / float(test_label.shape[0])
+num_batches = test_size / batch_size
+right_count = 0
+for i in xrange(num_batches):
+	minibatch = test_set[i*batch_size : (i+1)*batch_size]
+	label = test_label[i*batch_size : (i+1)*batch_size]
+	minibatch = minibatch.reshape((batch_size, 1, image_row, image_col))
+	prediction = convnet.predict(minibatch)
+	right_count += np.sum(prediction == label)
+test_accuracy = right_count / float(test_size)
 pprint('Test set accuracy: %f' % test_accuracy)
 
 

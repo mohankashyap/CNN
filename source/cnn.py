@@ -147,6 +147,6 @@ class ConvNet(object):
 		Recover model from file
 		'''
 		with file(fname, 'rb') as fin:
-			model = cPickle(fin)
+			model = cPickle.load(fin)
 			return model
 
