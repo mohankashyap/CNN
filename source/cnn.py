@@ -39,14 +39,14 @@ class ConvNet(object):
 		self.image_col = configs.image_col
 		# There may have multiple convolution-pooling and multi-layer perceptrons.
 		self.convpool_layers = []
-		self.mlp_layers = []
+		self.hidden_layers = []
 		self.softmax_layers = []
 		# Configure activation function
 		self.act = Activation(configs.activation)
 		# Configuration should be valid
 		assert configs.num_convpool == len(configs.convs)
 		assert configs.num_convpool == len(configs.pools)
-		assert configs.num_mlp == len(configs.mlps)
+		assert configs.num_hidden == len(configs.hiddens)
 		assert configs.num_softmax == len(configs.softmaxs)
 		# Build architecture of CNN
 		# Convolution and Pooling layers
@@ -70,11 +70,11 @@ class ConvNet(object):
 		# Multilayer perceptron layers
 		for i in xrange(configs.num_mlp):
 			if i == 0: current_input = T.flatten(self.convpool_layers[configs.num_convpool-1].output, 2)
-			else: current_input = self.mlp_layers[i-1].output
-			self.mlp_layers.append(HiddenLayer(current_input, configs.mlps[i], act=self.act))
+			else: current_input = self.hidden_layers[i-1].output
+			self.hidden_layers.append(HiddenLayer(current_input, configs.mlps[i], act=self.act))
 		# Softmax Layer, for most case, the architecture will only contain one softmax layer
 		for i in xrange(configs.num_softmax):
-			if i == 0: current_input = self.mlp_layers[configs.num_mlp-1].output
+			if i == 0: current_input = self.hidden_layers[configs.num_mlp-1].output
 			else: current_input = self.softmax_layers[i-1].output
 			self.softmax_layers.append(SoftmaxLayer(current_input, configs.softmaxs[i]))
 		# Output
@@ -86,8 +86,8 @@ class ConvNet(object):
 		self.params = []
 		for convpool_layer in self.convpool_layers:
 			self.params.extend(convpool_layer.params)
-		for mlp_layer in self.mlp_layers:
-			self.params.extend(mlp_layer.params)
+		for hidden_layer in self.hidden_layers:
+			self.params.extend(hidden_layer.params)
 		for softmax_layer in self.softmax_layers:
 			self.params.extend(softmax_layer.params)
 		# Compute gradient of self.cost with respect to network parameters
@@ -104,7 +104,7 @@ class ConvNet(object):
 			pprint('Architecture building finished, summarized as below: ')
 			pprint('There are %d layers (not including the input layer) algether: ' % (configs.num_convpool*2 + configs.num_mlp + configs.num_softmax))
 			pprint('%d convolution layers + %d maxpooling layers.' % (len(self.convpool_layers), len(self.convpool_layers)))
-			pprint('%d fully connected layers.' % (len(self.mlp_layers)))
+			pprint('%d hidden layers.' % (len(self.hidden_layers)))
 			pprint('%d softmax layers.' % (len(self.softmax_layers)))
 			pprint('=' * 50)
 			pprint('Detailed architecture of each layer: ')
@@ -115,9 +115,9 @@ class ConvNet(object):
 				pprint('%d feature maps, each has a filter kernel with size (%d, %d)' % (configs.convs[i][0], configs.convs[i][1], configs.convs[i][2]))
 			pprint('-' * 50)
 			pprint('Hidden layers: ')
-			for i in xrange(len(self.mlp_layers)):
+			for i in xrange(len(self.hidden_layers)):
 				pprint('Hidden Layer %d: ' % i)
-				pprint('Input dimension: %d, Output dimension: %d' % (configs.mlps[i][0], configs.mlps[i][1]))
+				pprint('Input dimension: %d, Output dimension: %d' % (configs.hiddens[i][0], configs.hiddens[i][1]))
 			pprint('-' * 50)
 			pprint('Softmax layers: ')
 			for i in xrange(len(self.softmax_layers)):

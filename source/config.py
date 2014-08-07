@@ -20,7 +20,7 @@ class CNNConfiger(object):
 		self._cf_parser.read(fname)
 		# Parsing 
 		self.activation, self.nepoch, self.batch_size, self.image_row, self.image_col, \
-		self.num_convpool, self.num_mlp, self.num_softmax, self.convs, self.pools, self.mlps, \
+		self.num_convpool, self.num_hidden, self.num_softmax, self.convs, self.pools, self.hiddens, \
 		self.softmaxs = self.parse()
 
 	def get(self, cfg_object, cfg_section):
@@ -37,11 +37,11 @@ class CNNConfiger(object):
 		image_row = self._cf_parser.getint('input', 'imagerow')
 		image_col = self._cf_parser.getint('input', 'imagecol')
 		num_convpool = self._cf_parser.getint('architectures', 'convpool')
-		num_mlp = self._cf_parser.getint('architectures', 'mlp')
+		num_hidden = self._cf_parser.getint('architectures', 'hidden')
 		num_softmax = self._cf_parser.getint('architectures', 'softmax')
 		# Load architecture of convolution and pooling layers
 		convs, pools = [], []
-		mlps = []
+		hiddens = []
 		softmaxs = []
 		# Load detailed architecture for each layer
 		for i in xrange(num_convpool):
@@ -53,9 +53,9 @@ class CNNConfiger(object):
 			pools.append(l)
 
 		for i in xrange(num_mlp):
-			l = self._cf_parser.get('layers', 'mlp'+str(i+1))
+			l = self._cf_parser.get('layers', 'hidden'+str(i+1))
 			l = [int(x) for x in l.split(',')]
-			mlps.append(l)
+			hiddens.append(l)
 
 		for i in xrange(num_softmax):
 			l = self._cf_parser.get('layers', 'softmax'+str(i+1))
@@ -63,7 +63,7 @@ class CNNConfiger(object):
 			softmaxs.append(l)
 
 		return (activation, nepoch, batch_size, image_row, image_col, 
-				num_convpool, num_mlp, num_softmax, convs, pools, mlps, softmaxs)
+				num_convpool, num_hidden, num_softmax, convs, pools, hiddens, softmaxs)
 
 
 class MLPConfiger(object):
