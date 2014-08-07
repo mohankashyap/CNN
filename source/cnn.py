@@ -68,13 +68,13 @@ class ConvNet(object):
 			self.convpool_layers.append(LeNetConvPoolLayer(input=current_input, filter_shape=filter_shapes[i], 
 					image_shape=image_shapes[i], poolsize=configs.pools[i], act=self.act))
 		# Multilayer perceptron layers
-		for i in xrange(configs.num_mlp):
+		for i in xrange(configs.num_hidden):
 			if i == 0: current_input = T.flatten(self.convpool_layers[configs.num_convpool-1].output, 2)
 			else: current_input = self.hidden_layers[i-1].output
-			self.hidden_layers.append(HiddenLayer(current_input, configs.mlps[i], act=self.act))
+			self.hidden_layers.append(HiddenLayer(current_input, configs.hiddens[i], act=self.act))
 		# Softmax Layer, for most case, the architecture will only contain one softmax layer
 		for i in xrange(configs.num_softmax):
-			if i == 0: current_input = self.hidden_layers[configs.num_mlp-1].output
+			if i == 0: current_input = self.hidden_layers[configs.num_hidden-1].output
 			else: current_input = self.softmax_layers[i-1].output
 			self.softmax_layers.append(SoftmaxLayer(current_input, configs.softmaxs[i]))
 		# Output
@@ -102,7 +102,7 @@ class ConvNet(object):
 		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 		if verbose:
 			pprint('Architecture building finished, summarized as below: ')
-			pprint('There are %d layers (not including the input layer) algether: ' % (configs.num_convpool*2 + configs.num_mlp + configs.num_softmax))
+			pprint('There are %d layers (not including the input layer) algether: ' % (configs.num_convpool*2 + configs.num_hidden + configs.num_softmax))
 			pprint('%d convolution layers + %d maxpooling layers.' % (len(self.convpool_layers), len(self.convpool_layers)))
 			pprint('%d hidden layers.' % (len(self.hidden_layers)))
 			pprint('%d softmax layers.' % (len(self.softmax_layers)))

@@ -52,7 +52,7 @@ class CNNConfiger(object):
 			l = [int(x) for x in l.split(',')]
 			pools.append(l)
 
-		for i in xrange(num_mlp):
+		for i in xrange(num_hidden):
 			l = self._cf_parser.get('layers', 'hidden'+str(i+1))
 			l = [int(x) for x in l.split(',')]
 			hiddens.append(l)

@@ -140,9 +140,9 @@ class TestSentiment(unittest.TestCase):
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
-	# @unittest.skip('Wait for testing.')
-	# accuracy @ sigmoid = 0.7104
-	# accuracy @ tanh = 0.7159
+	@unittest.skip('accuracy @ sigmoid = 0.7104 \
+					accuracy @ tanh = 0.7159 \
+					accuracy @ ReLU = 0.6584~0.7094')
 	def testCNN(self):
 		conf_filename = './sentiment_cnn.conf'
 		# Build the architecture of CNN
@@ -158,7 +158,8 @@ class TestSentiment(unittest.TestCase):
 		start_time = time.time()
 		for i in xrange(configer.nepoch):
 			right_count = 0
-			rate = learn_rate / ((i/100+1) ** 2)
+			# rate = learn_rate
+			rate = learn_rate / (i/100+1)
 			for j in xrange(num_batches):
 				minibatch = self.senti_train_set[j*batch_size : (j+1)*batch_size, :]
 				minibatch = minibatch.reshape((batch_size, 1, configer.image_row, configer.image_col))
