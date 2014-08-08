@@ -150,4 +150,3 @@ class ConvNet(object):
 		with file(fname, 'rb') as fin:
 			model = cPickle.load(fin)
 			return model
-
