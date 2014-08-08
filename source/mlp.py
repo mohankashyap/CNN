@@ -280,8 +280,12 @@ class DAE(object):
 												self.act, configs.denoising, configs.sparsity, 
 												configs.lambda1, configs.mask, 
 												self.rng, verbose=False))
+		# Stack all the parameters
+		self.params = []
+		for i in xrange(configs.num_hidden):
+			self.params.extend(self.autoencoders[i].params)
 		# Build compression 
-		self.compress = theano.function(inputs=[self.input], outputs=self.autoencoders[configs.hidden-1].output)
+		self.compress = theano.function(inputs=[self.input], outputs=self.autoencoders[configs.num_hidden-1].output)
 		# Visualize the architecture of the deep auto-encoder
 		if verbose:
 			pprint('Architecture building finished, summarized below:')
@@ -298,7 +302,6 @@ class DAE(object):
 		@input: np.ndarray. Two dimensional input matrix. Input to the Deep Auto-encoder.
 		@learn_rate: float. Learning rate of the stochastic gradient descent algorithm.
 		'''
-		assert len(self.encode_layers) == len(self.decode_layers)
 		# Layer-wise training
 		current_input = input
 		total_cost = 0
