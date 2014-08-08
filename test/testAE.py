@@ -53,6 +53,7 @@ class TestAE(unittest.TestCase):
 		self.training_label = training_label
 		self.test_label = test_label
 
+	@unittest.skip('Model been trained, finished...')
 	def testAE(self):
 		# Set parameters
 		input = T.matrix(name='input')
@@ -69,12 +70,11 @@ class TestAE(unittest.TestCase):
 		pprint('Time used to build the AutoEncoder: %f seconds.' % (end_time-start_time))
 		batch_size = 1000
 		num_batches = self.training_set.shape[0] / batch_size
-		nepoch = 100
+		nepoch = 50
 		learn_rate = 1
 		start_time = time.time()
 		for i in xrange(nepoch):
 			rate = learn_rate
-			# rate = learn_rate / ((i/10+1) ** 2)
 			for j in xrange(num_batches):
 				train_set = self.training_set[j*batch_size : (j+1)*batch_size, :]
 				cost = ae.train(train_set, rate)
@@ -86,7 +86,22 @@ class TestAE(unittest.TestCase):
 						img_shape=(28, 28), tile_shape=(10, 10),
 						tile_spacing=(1, 1)))
 		image.save('filters_corruption_%.2f.png' % mask)
+		AutoEncoder.save('./autoencoder-mnist.model', ae)
 
+	# @unittest.skip('Not ready yet...')
+	def testRecons(self):
+		'''
+		Test the compression and reconstruction performance 
+		of the learned denoising auto-encoder.
+		'''
+		fname = './autoencoder-mnist.model'
+		ae = AutoEncoder.load(fname)
+		sio.savemat('test_set.mat', {'data' : self.test_set})
+		compressed_data = ae.compress(self.test_set)
+		sio.savemat('compressed_data.mat', {'data' : compressed_data})
+		reconstructed_data = ae.reconstruct(self.test_set)
+		sio.savemat('reconstructed_data.mat', {'data' : reconstructed_data})
+		pprint('Save all data into matlab version, finished...')
 
 if __name__ == '__main__':
 	unittest.main()

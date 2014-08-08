@@ -114,3 +114,47 @@ class MLPConfiger(object):
 		return (activation, nepoch, batch_size, sparsity,
 				lambda1, lambda2, num_hidden, num_softmax, hiddens, softmaxs)
 
+
+class DAEConfiger(object):
+	'''
+	Class for the configuration of the architecture of the deep [denoising|sparse] auto-encoder.
+	'''
+	def __init__(self, fname):
+		'''
+		@fname: String. File path to the configuration file of MLP.
+		'''
+		self._cf_parser = ConfigParser.ConfigParser()
+		self._cf_parser.read(fname)
+		# Parsing 
+		self.activation, self.nepoch, self.seed, self.denoising, self.sparsity, \
+		self.lambda1, self.mask, self.num_hidden, self.hiddens = self.parse()
+
+	def get(self, cfg_object, cfg_section):
+		'''
+		@cfg_object: String. Block title.
+		@cfg_section: String. Section title.
+		'''
+		return self._cf_parser.get(cfg_object, cfg_section)
+
+	def parse(self):
+		activation = self._cf_parser.get('functions', 'activations')
+		nepoch = self._cf_parser.getint('parameters', 'nepoch')
+		lambda1 = self._cf_parser.getfloat('parameters', 'lambda1')
+		mask = self._cf_parser.getfloat('parameters', 'mask')
+		num_hidden = self._cf_parser.getint('architectures', 'hidden')
+		
+		sparsity = self._cf_parser.getint('parameters', 'sparsity')
+		denoising = self._cf_parser.getint('parameters', 'denoising')
+		seed = self._cf_parser.getint('parameters', 'seed')
+		# Load architecture of convolution and pooling layers
+		hiddens = []
+		# Load detailed architecture for each layer
+		for i in xrange(num_hidden):
+			l = self._cf_parser.get('layers', 'hidden'+str(i+1))
+			l = [int(x) for x in l.split(',')]
+			hiddens.append(l)
+
+		return (activation, nepoch, seed, denoising, sparsity,
+				lambda1, mask, num_hidden, hiddens)
+
+
