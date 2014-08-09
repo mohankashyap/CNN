@@ -19,8 +19,8 @@ class CNNConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.learning_rate, self.nepoch, self.batch_size, self.image_row, self.image_col, \
-		self.num_convpool, self.num_mlp, self.num_softmax, self.convs, self.pools, self.mlps, \
+		self.activation, self.nepoch, self.batch_size, self.image_row, self.image_col, \
+		self.num_convpool, self.num_hidden, self.num_softmax, self.convs, self.pools, self.hiddens, \
 		self.softmaxs = self.parse()
 
 	def get(self, cfg_object, cfg_section):
@@ -32,17 +32,16 @@ class CNNConfiger(object):
 
 	def parse(self):
 		activation = self._cf_parser.get('functions', 'activations')
-		learning_rate = self._cf_parser.getfloat('parameters', 'learnrate')
 		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		batch_size = self._cf_parser.getint('input', 'batchsize')
 		image_row = self._cf_parser.getint('input', 'imagerow')
 		image_col = self._cf_parser.getint('input', 'imagecol')
 		num_convpool = self._cf_parser.getint('architectures', 'convpool')
-		num_mlp = self._cf_parser.getint('architectures', 'mlp')
+		num_hidden = self._cf_parser.getint('architectures', 'hidden')
 		num_softmax = self._cf_parser.getint('architectures', 'softmax')
 		# Load architecture of convolution and pooling layers
 		convs, pools = [], []
-		mlps = []
+		hiddens = []
 		softmaxs = []
 		# Load detailed architecture for each layer
 		for i in xrange(num_convpool):
@@ -53,18 +52,18 @@ class CNNConfiger(object):
 			l = [int(x) for x in l.split(',')]
 			pools.append(l)
 
-		for i in xrange(num_mlp):
-			l = self._cf_parser.get('layers', 'mlp'+str(i+1))
+		for i in xrange(num_hidden):
+			l = self._cf_parser.get('layers', 'hidden'+str(i+1))
 			l = [int(x) for x in l.split(',')]
-			mlps.append(l)
+			hiddens.append(l)
 
 		for i in xrange(num_softmax):
 			l = self._cf_parser.get('layers', 'softmax'+str(i+1))
 			l = [int(x) for x in l.split(',')]
 			softmaxs.append(l)
 
-		return (activation, learning_rate, nepoch, batch_size, image_row, image_col, 
-				num_convpool, num_mlp, num_softmax, convs, pools, mlps, softmaxs)
+		return (activation, nepoch, batch_size, image_row, image_col, 
+				num_convpool, num_hidden, num_softmax, convs, pools, hiddens, softmaxs)
 
 
 class MLPConfiger(object):
@@ -78,7 +77,7 @@ class MLPConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.learning_rate, self.nepoch, self.batch_size, self.sparsity, \
+		self.activation, self.nepoch, self.batch_size, self.sparsity, \
 		self.lambda1, self.lambda2, self.num_hidden, self.num_softmax, \
 		self.hiddens, self.softmaxs = self.parse()
 
@@ -91,7 +90,6 @@ class MLPConfiger(object):
 
 	def parse(self):
 		activation = self._cf_parser.get('functions', 'activations')
-		learning_rate = self._cf_parser.getfloat('parameters', 'learnrate')
 		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		batch_size = self._cf_parser.getint('input', 'batchsize')
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
@@ -113,6 +111,50 @@ class MLPConfiger(object):
 			l = [int(x) for x in l.split(',')]
 			softmaxs.append(l)
 
-		return (activation, learning_rate, nepoch, batch_size, sparsity,
+		return (activation, nepoch, batch_size, sparsity,
 				lambda1, lambda2, num_hidden, num_softmax, hiddens, softmaxs)
+
+
+class DAEConfiger(object):
+	'''
+	Class for the configuration of the architecture of the deep [denoising|sparse] auto-encoder.
+	'''
+	def __init__(self, fname):
+		'''
+		@fname: String. File path to the configuration file of MLP.
+		'''
+		self._cf_parser = ConfigParser.ConfigParser()
+		self._cf_parser.read(fname)
+		# Parsing 
+		self.activation, self.nepoch, self.seed, self.denoising, self.sparsity, \
+		self.lambda1, self.mask, self.num_hidden, self.hiddens = self.parse()
+
+	def get(self, cfg_object, cfg_section):
+		'''
+		@cfg_object: String. Block title.
+		@cfg_section: String. Section title.
+		'''
+		return self._cf_parser.get(cfg_object, cfg_section)
+
+	def parse(self):
+		activation = self._cf_parser.get('functions', 'activations')
+		nepoch = self._cf_parser.getint('parameters', 'nepoch')
+		lambda1 = self._cf_parser.getfloat('parameters', 'lambda1')
+		mask = self._cf_parser.getfloat('parameters', 'mask')
+		num_hidden = self._cf_parser.getint('architectures', 'hidden')
+		
+		sparsity = self._cf_parser.getint('parameters', 'sparsity')
+		denoising = self._cf_parser.getint('parameters', 'denoising')
+		seed = self._cf_parser.getint('parameters', 'seed')
+		# Load architecture of convolution and pooling layers
+		hiddens = []
+		# Load detailed architecture for each layer
+		for i in xrange(num_hidden):
+			l = self._cf_parser.get('layers', 'hidden'+str(i+1))
+			l = [int(x) for x in l.split(',')]
+			hiddens.append(l)
+
+		return (activation, nepoch, seed, denoising, sparsity,
+				lambda1, mask, num_hidden, hiddens)
+
 
