@@ -56,8 +56,10 @@ class TestSent(unittest.TestCase):
 		pprint('Remapping words...')
 		# build mappings
 		recons_words = map(lambda x: self.word_embedding.index2word(x), indices)
-		pprint(self._index2word)
-		pprint(recons_words)
+		mappings = dict(zip(self._index2word, recons_words))
+		logfile = file('./log.txt', 'wb')
+		pprint(mappings, logfile)
+		logfile.close()
 		end_time = time.time()
 		pprint('Time used to find mapping: %f seconds.' % (end_time-start_time))
 
