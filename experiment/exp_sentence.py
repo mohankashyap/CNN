@@ -50,13 +50,18 @@ class TestSent(unittest.TestCase):
 		vectors.shape = (dict_size, 1, embed_dim)
 		recons_vectors.shape = (1, dict_size, embed_dim)
 		pprint('Finished reconstructing, start to computing distances...')
+		# Overall mappings
+		mappings = dict()
 		# Compute distance
-		diff = np.sum((vectors-recons_vectors)**2, axis=2)
-		indices = np.argmin(diff, axis=0)
-		pprint('Remapping words...')
-		# build mappings
-		recons_words = map(lambda x: self.word_embedding.index2word(x), indices)
-		mappings = dict(zip(self._index2word, recons_words))
+		batch_size = 1000
+		num_batches = dict_size / batch_size
+		for i in xrange(num_batches):
+			diff = np.sum((vectors[i*batch_size : (i+1)*batch_size, 0, :] - 
+							recons_vectors[0, i*batch_size : (i+1)*batch_size, :]) ** 2, axis=2)
+			indices = np.argmin(diff, axis=0)
+			pprint('Batch: %d' i)
+			recons_words = map(lambda x: self.word_embedding.index2word(x), indices)
+			mappings.update(dict(zip(self._index2word[i*batch_size : (i+1)*batch_size], recons_words)))
 		logfile = file('./log.txt', 'wb')
 		pprint(mappings, logfile)
 		logfile.close()
