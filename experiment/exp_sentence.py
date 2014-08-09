@@ -46,22 +46,16 @@ class TestSent(unittest.TestCase):
 		dict_size, embed_dim = self.word_embedding.dict_size(), self.word_embedding.embedding_dim()
 		vectors = self.word_embedding.embedding
 		recons_vectors = ae.reconstruct(vectors)
-		# Reshape for broadcasting
-		vectors.shape = (dict_size, 1, embed_dim)
 		pprint('Finished reconstructing, start to computing distances...')
 		# Overall mappings
 		mappings = dict()
 		# Compute distance
-		batch_size = 1000
-		num_batches = dict_size / batch_size
-		for i in xrange(num_batches):
-			batch_recons_vectors = recons_vectors[i*batch_size : (i+1)*batch_size, :]
-			batch_recons_vectors.shape = (1, batch_size, embed_dim)
-			diff = np.sum((vectors - batch_recons_vectors) ** 2, axis=2)
-			indices = np.argmin(diff, axis=0)
-			pprint('Batch: %d' % i)
-			recons_words = map(lambda x: self.word_embedding.index2word(x), indices)
-			mappings.update(dict(zip(self._index2word[i*batch_size : (i+1)*batch_size], recons_words)))
+		for i in xrange(dict_size):
+			recons_vec = recons_vectors[i, :]
+			diff = np.sum((vectors-recons_vec)**2, axis=1)
+			m = np.argmin(diff)
+			mappings[self.index2word[i]] = self.index2word[m] 
+			pprint('%s --> %s' % (self.index2word[i], self.index2word[m]))
 		logfile = file('./log.txt', 'wb')
 		pprint(mappings, logfile)
 		logfile.close()
