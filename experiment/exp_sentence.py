@@ -128,7 +128,7 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build AutoEncoder for word embedding: %f minutes.' %((end_time-start_time)/60))
 		start_time = time.time()
-		batch_size = 10000
+		batch_size = 10
 		num_batches = self.word_embedding.dict_size() / batch_size
 		for i in xrange(nepoch):
 			rate = learn_rate
