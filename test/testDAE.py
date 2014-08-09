@@ -13,6 +13,8 @@ import theano.tensor as T
 import numpy as np
 import unittest
 import time
+import PIL
+import imgutils
 
 from pprint import pprint
 from theano.tensor.shared_randomstreams import RandomStreams
@@ -52,7 +54,7 @@ class TestDAE(unittest.TestCase):
 		self.training_label = training_label
 		self.test_label = test_label
 
-	# @unittest.skip('Model been trained, finished...')
+	@unittest.skip('Model been trained, finished...')
 	def testDAE(self):
 		# Set parameters
 		configer = DAEConfiger('../experiment/mnist_dae.conf')
@@ -74,6 +76,19 @@ class TestDAE(unittest.TestCase):
 		pprint('Time used for training Deep Auto-Encoder: %f minutes.' % ((end_time-start_time)/60))
 		pprint('Model save finished...')
 
+	# @unittest.skip('Not ready yet...')
+	def testRecons(self):
+		'''
+		Test the compression and reconstruction performance 
+		of the learned denoising auto-encoder.
+		'''
+		fname = './dae-mnist.model'
+		dae = DAE.load(fname)
+		image = PIL.Image.fromarray(imgutils.tile_raster_images(
+						X=dae.autoencoders[0].encode_layer.W.get_value(borrow=True).T,
+						img_shape=(28, 28), tile_shape=(10, 10),
+						tile_spacing=(1, 1)))
+		image.save('dae_%.2f.png' % dae.mask)
 
 
 if __name__ == '__main__':

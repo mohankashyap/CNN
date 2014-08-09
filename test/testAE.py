@@ -88,7 +88,7 @@ class TestAE(unittest.TestCase):
 		image.save('filters_corruption_%.2f.png' % mask)
 		AutoEncoder.save('./autoencoder-mnist.model', ae)
 
-	# @unittest.skip('Not ready yet...')
+	@unittest.skip('Not ready yet...')
 	def testRecons(self):
 		'''
 		Test the compression and reconstruction performance 

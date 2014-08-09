@@ -20,9 +20,11 @@ class WordEmbedding(object):
 			self._dict_size, self._embed_dim = [int(s) for s in line.split()]
 			self._embedding = np.zeros((self._dict_size, self._embed_dim), dtype=floatX) 		
 			self._word2index = dict()
+			self._index2word = []
 			for i in xrange(self._dict_size):
 				line = fin.readline().split()
 				self._word2index[line[0]] = i
+				self._index2word.append(line[0])
 				self._embedding[i, :] = np.array([float(x) for x in line[1:]])
 
 	# Getters
@@ -31,7 +33,14 @@ class WordEmbedding(object):
 
 	def embedding_dim(self):
 		return self._embed_dim
+	
+	def words(self):
+		return self._word2index.keys()
 
+	@property
+	def embedding(self):
+	    return self._embedding
+	
 	def word2index(self, word):
 		'''
 		@word:	String. Return word index if word exists in the dictionary else -1
@@ -42,6 +51,13 @@ class WordEmbedding(object):
 		except KeyError:
 			pass
 		return idx
+
+	def index2word(self, index):
+		'''
+		@index: int. Return the corresponding word associated with index.
+		'''
+		assert 0 <= index < self._dict_size
+		return self._index2word[index]
 
 	def wordvec(self, word):
 		'''
