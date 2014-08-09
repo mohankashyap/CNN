@@ -48,7 +48,6 @@ class TestSent(unittest.TestCase):
 		recons_vectors = ae.reconstruct(vectors)
 		# Reshape for broadcasting
 		vectors.shape = (dict_size, 1, embed_dim)
-		recons_vectors.shape = (1, dict_size, embed_dim)
 		pprint('Finished reconstructing, start to computing distances...')
 		# Overall mappings
 		mappings = dict()
@@ -56,8 +55,9 @@ class TestSent(unittest.TestCase):
 		batch_size = 1000
 		num_batches = dict_size / batch_size
 		for i in xrange(num_batches):
-			diff = np.sum((vectors[i*batch_size : (i+1)*batch_size, 0, :] - 
-							recons_vectors[0, i*batch_size : (i+1)*batch_size, :]) ** 2, axis=2)
+			batch_recons_vectors = recons_vectors[i*batch_size : (i+1)*batch_size, :]
+			batch_recons_vectors.shape = (1, batch_size, embed_dim)
+			diff = np.sum((vectors - batch_recons_vectors) ** 2, axis=2)
 			indices = np.argmin(diff, axis=0)
 			pprint('Batch: %d' % i)
 			recons_words = map(lambda x: self.word_embedding.index2word(x), indices)
