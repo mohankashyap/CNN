@@ -59,7 +59,7 @@ class TestSent(unittest.TestCase):
 			diff = np.sum((vectors[i*batch_size : (i+1)*batch_size, 0, :] - 
 							recons_vectors[0, i*batch_size : (i+1)*batch_size, :]) ** 2, axis=2)
 			indices = np.argmin(diff, axis=0)
-			pprint('Batch: %d' i)
+			pprint('Batch: %d' % i)
 			recons_words = map(lambda x: self.word_embedding.index2word(x), indices)
 			mappings.update(dict(zip(self._index2word[i*batch_size : (i+1)*batch_size], recons_words)))
 		logfile = file('./log.txt', 'wb')
