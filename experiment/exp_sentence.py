@@ -54,10 +54,10 @@ class TestSent(unittest.TestCase):
 			recons_vec = recons_vectors[i, :]
 			diff = np.sum((vectors-recons_vec)**2, axis=1)
 			m = np.argmin(diff)
-			mappings[self.word_embedding.index2word[i]] = \
-					self.word_embedding.index2word[m] 
-			pprint('%s --> %s' % (self.word_embedding.index2word[i], 
-								self.word_embedding.index2word[m]))
+			mappings[self.word_embedding.index2word(i)] = \
+					self.word_embedding.index2word(m) 
+			pprint('%s --> %s' % (self.word_embedding.index2word(i), 
+								self.word_embedding.index2word(m)))
 		logfile = file('./log.txt', 'wb')
 		pprint(mappings, logfile)
 		logfile.close()
