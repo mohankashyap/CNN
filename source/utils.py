@@ -38,3 +38,9 @@ def reLU(x):
 	'''
 	return T.maximum(0, x)
 
+def identity(x):
+	'''
+	@x: theano symbolic tensor. Activation function used at each neuron in 
+		hidden layer. This is the identity mapping.
+	'''
+	return x

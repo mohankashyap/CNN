@@ -20,8 +20,62 @@ from activations import Activation
 from wordvec import WordEmbedding
 from pprint import pprint
 from utils import floatX
-from mlp import AutoEncoder, DAE
+from mlp import AutoEncoder, DAE, HiddenLayer
 from config import DAEConfiger
+
+class SentModel(object):
+	'''
+	Temporary sentence model to test the idea of using AutoEncoder + linear mapping
+	to generate the representation of sentences.
+	'''
+	def __init__(self, input, (num_in, num_out), act=None, 
+				is_denoising=True, is_sparse=True, 
+				lambda1=0.0, mask=0.0, rng=None, verbose=True):
+		if verbose: pprint('Build sentence model...')
+		# General architecture of sentence generating model:
+		# 1. AutoEncoder 
+		# 2. Linear projection layer
+		self.input = input
+		self.ae = AutoEncoder(self.input, (num_in, num_out), act, 
+						is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
+		self.output_layer = HiddenLayer(self.ae.output, (num_out, num_in), act=Activation('I'))
+		self.pretrain = self.ae.train
+		# Build cost function, and gradients
+		self.cost = T.mean(T.sum((self.output_layer.output-self.input) ** 2, 1))
+		self.params = []
+		self.params.extend(self.ae.encode_layer.params)
+		self.params.extend(self.output_layer.params)
+		self.gradparams = T.grad(self.cost, self.params)
+		# Learning rate of stochastic gradient descent algorithm
+		self.learn_rate = T.scalar()
+		# Stochastic Gradient Descent algorithm 
+		self.updates = []
+		for param, gradparam in zip(self.params, self.gradparams):
+			self.updates.append((param, param-self.learn_rate*gradparam))
+		# Output of the whole structure 
+		self.reconstruct = theano.function(inputs=[self.input], outputs=self.output_layer.output)
+		self.finetune = theano.function(inputs=[self.input, self.learn_rate], outputs=self.cost, updates=self.updates)
+
+	# def train(self, input, learn_rate, verbose=True):
+	# 	'''
+	# 	@input: np.ndarray. 2D matrix as the input matrix.
+	# 	@learn_rate: floatX. Learning rate of SGD algorithm.
+
+	# 	Note that this function should only be called when the pretraining 
+	# 	of AutoEncoder has finished.
+	# 	'''
+	@staticmethod
+	def save(fname, model):
+		with file(fname, 'wb') as fout:
+			cPickle.dump(model, fout)
+
+	@staticmethod
+	def load(fname):
+		with file(fname, 'rb') as fin:
+			model = cPickle.load(fin)
+			return model
+
+
 
 class TestSent(unittest.TestCase):
 	def setUp(self):
@@ -140,7 +194,7 @@ class TestSent(unittest.TestCase):
 		pprint('Time used to train AutoEncoder: %f minutes.' % ((end_time-start_time)/60))
 
 
-	def testAEwithZpadding(self):
+	def testTrainSentModel(self):
 		'''
 		Here we try to attack the task of sentence generation by using AutoEncoder/Deep AutoEncoder and combined with supervised 
 		linear mapping. The architecture suggests first using stacked auto-encoders to learn a hidden representation and then 
@@ -166,17 +220,43 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build the vectorized array: %f seconds.' % (end_time-start_time))
 		# Save padding matrices
-		sio.savemat('senti_train_set.mat', {'data' : aug_senti_train_set)})
+		sio.savemat('senti_train_set.mat', {'data' : aug_senti_train_set})
 		sio.savemat('senti_test_set.mat', {'data' : aug_senti_test_set})
 		pprint('Padded matrices saved...')
 		# Train an auto-encoder with last layer as a linear mapping
-		
-
+		# Configure the parameters of the AutoEncoder
+		hidden_dim = 500
+		seed = 42
+		input_matrix = T.matrix(name='input')
+		num_in, num_out = input_dim, hidden_dim
+		act = Activation('sigmoid')
+		is_denoising, is_sparse = True, False
+		lambda1, mask = 1e-4, 0.7
+		rng = RandomStreams(seed)
+		# Build the structure of Naive sentence model
+		start_time = time.time()
+		sent_model = SentModel(input_matrix, (num_in, num_out), act, 
+							is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
+		end_time = time.time()
+		pprint('Time used to build the sentence model: %f seconds.' % (end_time-start_time))
+		# Minibatch Training of the naive model
+		nepoch = 50
+		learn_rate = 1
+		start_time = time.time()
+		for i in xrange(nepoch):
+			rate = learn_rate
+			cost = sent_model.pretrain(aug_senti_train_set, rate)
+			pprint('epoch %d, pretrain cost = %f' % (i, cost))
+			# Save model
+			SentModel.save('sentiment.sent', sent_model)
+		end_time = time.time()
+		pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
+		for i in xrange(nepoch):
+			rate = learn_rate
+			cost = sent_model.finetune(aug_senti_train_set, rate)
+			pprint('epoch %d, fine tune cost = %f' % (i, cost))
+			SentModel.save('sentiment.sent', sent_model)
+		pprint('Model been saved as sentiment.sent')
 
 if __name__ == '__main__':
 	unittest.main()
-
-
-
-
-

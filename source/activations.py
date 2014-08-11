@@ -22,6 +22,8 @@ class Activation(object):
 			self.func = T.tanh
 		elif method == "ReLU":
 			self.func = utils.reLU
+		elif method == 'I':
+			self.func = utils.identity
 		else:
 			raise ValueError('Invalid Activation function!')
 
