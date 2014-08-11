@@ -1,4 +1,7 @@
-Convolutional Neural Network in Theano
+Simple Neural Network modules implemented using Theano for experiments in research project.
 =======================================
-Tools written as an exercise for future research project in NLP. 
-The architecture of CNN is configurable in file.
+Supporting the following models configured by a file
+
+1. 	Convolutional Neural Network
+2. 	Multilayer Perceptron
+3. 	[Denoising|Sparse|Deep] AutoEncoder
