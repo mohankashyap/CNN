@@ -6,6 +6,7 @@
 # @Version : 0.1
 
 import os, sys
+import gzip
 sys.path.append('../source/')
 import unittest
 import cPickle
@@ -238,29 +239,34 @@ class TestSent(unittest.TestCase):
 		rng = RandomStreams(seed)
 		# Build the structure of Naive sentence model
 		start_time = time.time()
-		sent_model = SentModel(input_matrix, (num_in, num_out), act, 
-							is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
+		with gzip.GzipFile('sentiment.sent.gz', 'rb') as fin:
+			sent_model = cPickle.load(fin)
+		# sent_model = SentModel.load('./sentiment.sent')
+		# sent_model = SentModel(input_matrix, (num_in, num_out), act, 
+		# 					is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build the sentence model: %f seconds.' % (end_time-start_time))
 		# Minibatch Training of the naive model
 		nepoch = 50
-		learn_rate = 0.1
-		start_time = time.time()
-		for i in xrange(nepoch):
-			rate = learn_rate
-			cost = sent_model.pretrain(aug_senti_train_set, rate)
-			pprint('epoch %d, pretrain cost = %f' % (i, cost))
-		SentModel.save('./sentiment.sent', sent_model)
-		end_time = time.time()
-		pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
+		learn_rate = 0.3
+		# start_time = time.time()
+		# for i in xrange(nepoch):
+		# 	rate = learn_rate
+		# 	cost = sent_model.pretrain(aug_senti_train_set, rate)
+		# 	pprint('epoch %d, pretrain cost = %f' % (i, cost))
+		# SentModel.save('./sentiment.sent', sent_model)
+		# end_time = time.time()
+		# pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
 		nepoch = 50
 		learn_rate = 0.1
 		for i in xrange(nepoch):
 			rate = learn_rate 
 			cost = sent_model.finetune(aug_senti_train_set, rate)
 			pprint('epoch %d, fine tune cost = %f' % (i, cost))
-		SentModel.save('./sentiment.sent', sent_model)
-		pprint('Model been saved as sentiment.sent')
+		# SentModel.save('./sentiment.sent', sent_model)
+		with gzip.GzipFile('sentiment.sent.gz', 'wb') as fout:
+			cPickle.dump(sent_model, fout)
+		# pprint('Model been saved as sentiment.sent.gz')
 
 	@unittest.skip('Retry the whole staff...')
 	def testSentModel(self):
