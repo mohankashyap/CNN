@@ -242,7 +242,7 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build the sentence model: %f seconds.' % (end_time-start_time))
 		# Minibatch Training of the naive model
-		nepoch = 50
+		nepoch = 10
 		learn_rate = 1
 		start_time = time.time()
 		for i in xrange(nepoch):
