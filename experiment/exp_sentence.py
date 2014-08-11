@@ -38,7 +38,7 @@ class SentModel(object):
 		self.input = input
 		self.ae = AutoEncoder(self.input, (num_in, num_out), act, 
 						is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
-		self.output_layer = HiddenLayer(self.ae.output, (num_out, num_in), act=Activation('I'))
+		self.output_layer = HiddenLayer(self.ae.output, (num_out, num_in), act=Activation('tanh'))
 		# Build cost function, and gradients
 		self.cost = T.mean(T.sum((self.output_layer.output-self.input) ** 2, 1))
 		self.params = []
@@ -195,7 +195,8 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to train AutoEncoder: %f minutes.' % ((end_time-start_time)/60))
 
-
+	# @unittest.skip('Pretraining error: 32.20\
+	# 				Fine-tuning error: 30.877')
 	def testTrainSentModel(self):
 		'''
 		Here we try to attack the task of sentence generation by using AutoEncoder/Deep AutoEncoder and combined with supervised 
@@ -228,12 +229,12 @@ class TestSent(unittest.TestCase):
 		# Train an auto-encoder with last layer as a linear mapping
 		# Configure the parameters of the AutoEncoder
 		hidden_dim = 500
-		seed = 42
+		seed = 1991
 		input_matrix = T.matrix(name='input')
 		num_in, num_out = input_dim, hidden_dim
-		act = Activation('sigmoid')
+		act = Activation('tanh')
 		is_denoising, is_sparse = True, False
-		lambda1, mask = 1e-4, 0.7
+		lambda1, mask = 1e-4, 0.5
 		rng = RandomStreams(seed)
 		# Build the structure of Naive sentence model
 		start_time = time.time()
@@ -242,8 +243,8 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build the sentence model: %f seconds.' % (end_time-start_time))
 		# Minibatch Training of the naive model
-		nepoch = 10
-		learn_rate = 1
+		nepoch = 50
+		learn_rate = 0.1
 		start_time = time.time()
 		for i in xrange(nepoch):
 			rate = learn_rate
@@ -252,12 +253,53 @@ class TestSent(unittest.TestCase):
 		SentModel.save('./sentiment.sent', sent_model)
 		end_time = time.time()
 		pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
+		nepoch = 50
+		learn_rate = 0.1
 		for i in xrange(nepoch):
-			rate = learn_rate
+			rate = learn_rate 
 			cost = sent_model.finetune(aug_senti_train_set, rate)
 			pprint('epoch %d, fine tune cost = %f' % (i, cost))
 		SentModel.save('./sentiment.sent', sent_model)
 		pprint('Model been saved as sentiment.sent')
+
+	@unittest.skip('Retry the whole staff...')
+	def testSentModel(self):
+		'''
+		Test the idea discussing with Zhengdong to use a linear mapping 
+		at the final layer.
+		'''
+		max_length = 0
+		max_length = max(max_length, max([len(sentence) for sentence in self.senti_train_set]))
+		max_length = max(max_length, max([len(sentence) for sentence in self.senti_test_set]))
+		input_dim = self.word_embedding.embedding_dim() * max_length
+		# Load trained model
+		sent_model = SentModel.load('./sentiment.sent')
+		aug_senti_test_set = np.zeros((self.senti_test_set.shape[0], input_dim), dtype=floatX)
+		# Training set size and test set size
+		start_time = time.time()
+		for i, sent in enumerate(self.senti_test_set):
+			length = np.prod(sent.shape)
+			aug_senti_test_set[i, :length] = sent.reshape(1, -1)
+		end_time = time.time()
+		pprint('Time used to build the vectorized array: %f seconds.' % (end_time-start_time))
+		sio.savemat('origin_senti_test_set.mat', {'data' : aug_senti_test_set})
+		# Get reconstructed sentence representation
+		start_time = time.time()
+		recons_aug_senti_test_set = sent_model.reconstruct(aug_senti_test_set)
+		end_time = time.time()
+		pprint('Time used to compute the reconstruction: %f seconds.' % (end_time-start_time))
+		sio.savemat('recons_senti_test_set.mat', {'data' : recons_aug_senti_test_set})
+		pprint('Print intermediate representation: ')
+		func1 = theano.function(inputs=[sent_model.input], outputs=sent_model.ae.output)
+		func2 = theano.function(inputs=[sent_model.input], outputs=sent_model.ae.recons)
+		intermediate1_aug_senti_test_set = func1(aug_senti_test_set)
+		intermediate2_aug_senti_test_set = func2(aug_senti_test_set)
+		sio.savemat('intermediate1_senti_test_set.mat', {'data' : intermediate1_aug_senti_test_set})
+		sio.savemat('intermediate2_senti_test_set.mat', {'data' : intermediate2_aug_senti_test_set})
+		sio.savemat('AE_W.mat', {'data' : sent_model.ae.encode_layer.W.get_value()})
+		sio.savemat('AE_b.mat', {'data' : sent_model.ae.encode_layer.b.get_value()})
+		sio.savemat('LM_W.mat', {'data' : sent_model.output_layer.W.get_value()})
+		sio.savemat('LM_b.mat', {'data' : sent_model.output_layer.b.get_value()})
 
 
 if __name__ == '__main__':
