@@ -15,7 +15,7 @@ import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
 import scipy.io as sio
 import numpy as np
-
+	
 from activations import Activation
 from wordvec import WordEmbedding
 from pprint import pprint
@@ -35,6 +35,7 @@ class TestSent(unittest.TestCase):
 		pprint('%d sentences in the training set.' % len(self.senti_train_set))
 		pprint('%d sentences in the test set.' % len(self.senti_test_set))
 
+	@unittest.skip('Try to learn a non-linear mapping upon the auto-encoder, failed.')
 	def testGenerate(self):
 		'''
 		Try using Denoising AutoEncoder to naivelly compressing and reconstructing 
@@ -139,5 +140,43 @@ class TestSent(unittest.TestCase):
 		pprint('Time used to train AutoEncoder: %f minutes.' % ((end_time-start_time)/60))
 
 
+	def testAEwithZpadding(self):
+		'''
+		Here we try to attack the task of sentence generation by using AutoEncoder/Deep AutoEncoder and combined with supervised 
+		linear mapping. The architecture suggests first using stacked auto-encoders to learn a hidden representation and then 
+		try to recover the original sentence by a linear projection onto the original space.
+		'''
+		# Find the longest sentence in the training and test data set
+		max_length = 0
+		max_length = max(max_length, max([len(sentence) for sentence in self.senti_train_set]))
+		max_length = max(max_length, max([len(sentence) for sentence in self.senti_test_set]))
+		pprint('Longest sentence in both training and test part.')
+		input_dim = self.word_embedding.embedding_dim() * max_length
+		# Build training and test data set with 0 padding
+		aug_senti_train_set = np.zeros((self.senti_train_set.shape[0], input_dim), dtype=floatX)
+		aug_senti_test_set = np.zeros((self.senti_test_set.shape[0], input_dim), dtype=floatX)
+		# Training set size and test set size
+		start_time = time.time()
+		for i, sent in enumerate(self.senti_train_set):
+			length = np.prod(sent.shape)
+			aug_senti_train_set[i, :length] = sent.reshape(1, -1)
+		for i, sent in enumerate(self.senti_test_set):
+			length = np.prod(sent.shape)
+			aug_senti_test_set[i, :length] = sent.reshape(1, -1)
+		end_time = time.time()
+		pprint('Time used to build the vectorized array: %f seconds.' % (end_time-start_time))
+		# Save padding matrices
+		sio.savemat('senti_train_set.mat', {'data' : aug_senti_train_set)})
+		sio.savemat('senti_test_set.mat', {'data' : aug_senti_test_set})
+		pprint('Padded matrices saved...')
+		# Train an auto-encoder with last layer as a linear mapping
+		
+
+
 if __name__ == '__main__':
 	unittest.main()
+
+
+
+
+
