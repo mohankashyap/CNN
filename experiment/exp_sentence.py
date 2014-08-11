@@ -39,7 +39,6 @@ class SentModel(object):
 		self.ae = AutoEncoder(self.input, (num_in, num_out), act, 
 						is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
 		self.output_layer = HiddenLayer(self.ae.output, (num_out, num_in), act=Activation('I'))
-		self.pretrain = self.ae.train
 		# Build cost function, and gradients
 		self.cost = T.mean(T.sum((self.output_layer.output-self.input) ** 2, 1))
 		self.params = []
@@ -55,6 +54,9 @@ class SentModel(object):
 		# Output of the whole structure 
 		self.reconstruct = theano.function(inputs=[self.input], outputs=self.output_layer.output)
 		self.finetune = theano.function(inputs=[self.input, self.learn_rate], outputs=self.cost, updates=self.updates)
+
+	def pretrain(self, input, learn_rate):
+		return self.ae.train(input, learn_rate)
 
 	# def train(self, input, learn_rate, verbose=True):
 	# 	'''
@@ -247,16 +249,16 @@ class TestSent(unittest.TestCase):
 			rate = learn_rate
 			cost = sent_model.pretrain(aug_senti_train_set, rate)
 			pprint('epoch %d, pretrain cost = %f' % (i, cost))
-			# Save model
-			SentModel.save('sentiment.sent', sent_model)
+		SentModel.save('./sentiment.sent', sent_model)
 		end_time = time.time()
 		pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
 		for i in xrange(nepoch):
 			rate = learn_rate
 			cost = sent_model.finetune(aug_senti_train_set, rate)
 			pprint('epoch %d, fine tune cost = %f' % (i, cost))
-			SentModel.save('sentiment.sent', sent_model)
+		SentModel.save('./sentiment.sent', sent_model)
 		pprint('Model been saved as sentiment.sent')
+
 
 if __name__ == '__main__':
 	unittest.main()
