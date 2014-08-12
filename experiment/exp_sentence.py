@@ -257,7 +257,7 @@ class TestSent(unittest.TestCase):
 		# SentModel.save('./sentiment.sent', sent_model)
 		# end_time = time.time()
 		# pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
-		nepoch = 50
+		nepoch = 500
 		learn_rate = 0.1
 		for i in xrange(nepoch):
 			rate = learn_rate 
