@@ -15,6 +15,9 @@ import theano
 import theano.tensor as T
 import numpy as np
 
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.linear_model import LogisticRegression
+
 from utils import floatX
 from cnn import ConvNet
 from logistic import SoftmaxLayer
@@ -40,6 +43,10 @@ class TestSentiment(unittest.TestCase):
 			senti_train_txt = fin.readlines()
 		with file(senti_test_set_filename) as fin:
 			senti_test_txt = fin.readlines()
+		# Store original text representation
+		self.senti_train_txt = senti_train_txt
+		self.senti_test_txt = senti_test_txt
+		# Word-vector representation
 		self.senti_train_label = np.loadtxt(senti_train_label_filename, dtype=np.int32)
 		self.senti_test_label = np.loadtxt(senti_test_label_filename, dtype=np.int32)
 		train_size = len(senti_train_txt)
@@ -184,6 +191,66 @@ class TestSentiment(unittest.TestCase):
 			right_count += np.sum(prediction == label)
 		test_accuracy = right_count / float(self.test_size)
 		pprint('Test set accuracy: %f' % test_accuracy)
+
+	def testBoGNB(self):
+		'''
+		Test on sentiment analysis task using Naive Bayes classifier 
+		with Bag-of-Word feature vectors.
+		'''
+		wordlist = []
+		# Preprocessing of original txt data set
+		for i, sent in enumerate(self.senti_train_txt):
+			words = sent.split()
+			words = [word.lower() for word in words if len(word) > 2]
+			wordlist.extend(words)
+		for i, sent in enumerate(self.senti_test_txt):
+			words = sent.split()
+			words = [word.lower() for word in words if len(word) > 2]
+			wordlist.extend(words)
+		word_dict = set(wordlist)
+		word2index = dict(zip(word_dict, range(len(word_dict))))
+		# Build BoG feature
+		train_size = len(self.senti_train_txt)
+		test_size = len(self.senti_test_txt)
+		pprint('Training set size: %d' % train_size)
+		pprint('Test set size: %d' % test_size)
+		train_feat = np.zeros((train_size, len(word_dict)), dtype=np.float)
+		test_feat = np.zeros((test_size, len(word_dict)), dtype=np.float)
+		# Using binary feature
+		start_time = time.time()
+		for i, sent in enumerate(self.senti_train_txt):
+			words = sent.split()
+			words = [word.lower() for word in words if len(word) > 2]
+			indices = map(lambda x: word2index[x], words)
+			train_feat[i, indices] = 1.0
+		for i, sent in enumerate(self.senti_test_txt):
+			words = sent.split()
+			words = [word.lower() for word in words if len(word) > 2]
+			indices = map(lambda x: word2index[x], words)
+			test_feat[i, indices] = 1.0
+		end_time = time.time()
+		pprint('Finished building training and test feature matrix, time used: %f seconds.' % (end_time-start_time))
+		pprint('Classification using Bernoulli Naive Bayes classifier: ')
+		clf = BernoulliNB()
+		# clf = LogisticRegression()
+		clf.fit(train_feat, self.senti_train_label)
+		train_pred_label = clf.predict(train_feat)
+		train_acc = np.sum(train_pred_label == self.senti_train_label) / float(train_size)
+		pprint('Training accuracy = %f' % train_acc)
+		pred_label = clf.predict(test_feat)
+		acc = np.sum(pred_label == self.senti_test_label) / float(test_size)
+		pprint('Accuracy: %f' % acc)
+		train_pos_count = np.sum(self.senti_train_label == 1)
+		train_neg_count = np.sum(self.senti_train_label == 0)
+		test_pos_count = np.sum(self.senti_test_label == 1)
+		test_neg_count = np.sum(self.senti_test_label == 0)
+		pprint('Positive count in training set: %d' % train_pos_count)
+		pprint('Negative count in training set: %d' % train_neg_count)
+		pprint('Ratio: pos/neg = %f' % (float(train_pos_count) / train_neg_count))
+		pprint('Positive count in test set: %d' % test_pos_count)
+		pprint('Negative count in test set: %d' % test_neg_count)
+		pprint('Ratio: pos/neg = %f' % (float(test_pos_count) / test_neg_count))
+
 
 if __name__ == '__main__':
 	unittest.main()

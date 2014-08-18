@@ -17,6 +17,7 @@ from theano.tensor.shared_randomstreams import RandomStreams
 import scipy.io as sio
 import numpy as np
 	
+from logistic import SoftmaxLayer
 from activations import Activation
 from wordvec import WordEmbedding
 from pprint import pprint
@@ -59,14 +60,6 @@ class SentModel(object):
 	def pretrain(self, input, learn_rate):
 		return self.ae.train(input, learn_rate)
 
-	# def train(self, input, learn_rate, verbose=True):
-	# 	'''
-	# 	@input: np.ndarray. 2D matrix as the input matrix.
-	# 	@learn_rate: floatX. Learning rate of SGD algorithm.
-
-	# 	Note that this function should only be called when the pretraining 
-	# 	of AutoEncoder has finished.
-	# 	'''
 	@staticmethod
 	def save(fname, model):
 		with file(fname, 'wb') as fout:
@@ -79,9 +72,36 @@ class SentModel(object):
 			return model
 
 
-
 class TestSent(unittest.TestCase):
 	def setUp(self):
+		origin_set_filename = '../data/origin_senti_set.mat'
+		recons_set_filename = '../data/recons_senti_set.mat'
+		inter_set_filename = '../data/inter_senti_set.mat'
+		train_label_filename = '../data/sentiment_train_label.txt'
+		test_label_filename = '../data/sentiment_test_label.txt'
+		train_txt_filename = '../data/sentiment_train_txt.txt'
+		test_txt_filename = '../data/sentiment_test_txt.txt'
+		wiki_filename = '../data/wiki_embeddings.txt'
+		start_time = time.time()
+		self.word_embedding = WordEmbedding(wiki_filename)
+		self.origin = sio.loadmat(origin_set_filename)
+		self.recons = sio.loadmat(recons_set_filename)
+		self.inter = sio.loadmat(inter_set_filename)
+		self.train_label = np.loadtxt(train_label_filename, dtype=np.int32)
+		self.test_label = np.loadtxt(test_label_filename, dtype=np.int32)
+		# Training and test size
+		self.train_size = len(self.train_label)
+		self.test_size = len(self.test_label)
+		# Load raw texts
+		with file(train_txt_filename, 'rb') as fin:
+			self.train_txt = fin.readlines()
+		with file(test_txt_filename, 'rb') as fin:
+			self.test_txt = fin.readlines()
+		end_time = time.time()
+		pprint('Time used to load all the staff: %f seconds.' % (end_time-start_time))
+
+	@unittest.skip('old function for loading training and test data set')
+	def testLoad(self):
 		train_set_filename = '../data/sentiment_train.mat'
 		test_set_filename = '../data/sentiment_test.mat'
 		embedding_filename = '../data/wiki_embeddings.txt'
@@ -112,10 +132,10 @@ class TestSent(unittest.TestCase):
 			recons_vec = recons_vectors[i, :]
 			diff = np.sum((vectors-recons_vec)**2, axis=1)
 			m = np.argmin(diff)
-			mappings[self.word_embedding.index2word[i]] = \
-					self.word_embedding.index2word[m] 
-			pprint('%s --> %s' % (self.word_embedding.index2word[i], 
-								self.word_embedding.index2word[m]))
+			mappings[self.word_embedding.index2word(i)] = \
+					self.word_embedding.index2word(m) 
+			pprint('%s --> %s' % (self.word_embedding.index2word(i), 
+								self.word_embedding.index2word(m)))
 		logfile = file('./log.txt', 'wb')
 		pprint(mappings, logfile)
 		logfile.close()
@@ -182,7 +202,7 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build AutoEncoder for word embedding: %f minutes.' %((end_time-start_time)/60))
 		start_time = time.time()
-		batch_size = 10000
+		batch_size = 10
 		num_batches = self.word_embedding.dict_size() / batch_size
 		for i in xrange(nepoch):
 			rate = learn_rate
@@ -196,8 +216,8 @@ class TestSent(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to train AutoEncoder: %f minutes.' % ((end_time-start_time)/60))
 
-	# @unittest.skip('Pretraining error: 32.20\
-	# 				Fine-tuning error: 30.877')
+	@unittest.skip('Pretraining error: 32.20\
+					Fine-tuning error: 30.877')
 	def testTrainSentModel(self):
 		'''
 		Here we try to attack the task of sentence generation by using AutoEncoder/Deep AutoEncoder and combined with supervised 
@@ -257,7 +277,7 @@ class TestSent(unittest.TestCase):
 		# SentModel.save('./sentiment.sent', sent_model)
 		# end_time = time.time()
 		# pprint('Time used to pretrain the naive sentence model: %f minutes.' % ((end_time-start_time)/60))
-		nepoch = 50
+		nepoch = 500
 		learn_rate = 0.1
 		for i in xrange(nepoch):
 			rate = learn_rate 
@@ -278,34 +298,105 @@ class TestSent(unittest.TestCase):
 		max_length = max(max_length, max([len(sentence) for sentence in self.senti_train_set]))
 		max_length = max(max_length, max([len(sentence) for sentence in self.senti_test_set]))
 		input_dim = self.word_embedding.embedding_dim() * max_length
+		pprint('Loading model into momery...')
 		# Load trained model
-		sent_model = SentModel.load('./sentiment.sent')
+		with gzip.GzipFile('./sentiment.sent.gz', 'rb') as fin:
+			sent_model = cPickle.load(fin)
+		pprint('Model loaded finished...')
+		# sent_model = SentModel.load('./sentiment.sent')
 		aug_senti_test_set = np.zeros((self.senti_test_set.shape[0], input_dim), dtype=floatX)
+		aug_senti_train_set = np.zeros((self.senti_train_set.shape[0], input_dim), dtype=floatX)
 		# Training set size and test set size
 		start_time = time.time()
+		for i, sent in enumerate(self.senti_train_set):
+			length = np.prod(sent.shape)
+			aug_senti_train_set[i, :length] = sent.reshape(1, -1)
 		for i, sent in enumerate(self.senti_test_set):
 			length = np.prod(sent.shape)
 			aug_senti_test_set[i, :length] = sent.reshape(1, -1)
 		end_time = time.time()
-		pprint('Time used to build the vectorized array: %f seconds.' % (end_time-start_time))
-		sio.savemat('origin_senti_test_set.mat', {'data' : aug_senti_test_set})
+		pprint('Original data saved...')
+		sio.savemat('origin_senti_set.mat', {'train' : aug_senti_train_set, 
+											 'test' : aug_senti_test_set})
 		# Get reconstructed sentence representation
 		start_time = time.time()
+		recons_aug_senti_train_set = sent_model.reconstruct(aug_senti_train_set)
 		recons_aug_senti_test_set = sent_model.reconstruct(aug_senti_test_set)
 		end_time = time.time()
-		pprint('Time used to compute the reconstruction: %f seconds.' % (end_time-start_time))
-		sio.savemat('recons_senti_test_set.mat', {'data' : recons_aug_senti_test_set})
-		pprint('Print intermediate representation: ')
-		func1 = theano.function(inputs=[sent_model.input], outputs=sent_model.ae.output)
-		func2 = theano.function(inputs=[sent_model.input], outputs=sent_model.ae.recons)
-		intermediate1_aug_senti_test_set = func1(aug_senti_test_set)
-		intermediate2_aug_senti_test_set = func2(aug_senti_test_set)
-		sio.savemat('intermediate1_senti_test_set.mat', {'data' : intermediate1_aug_senti_test_set})
-		sio.savemat('intermediate2_senti_test_set.mat', {'data' : intermediate2_aug_senti_test_set})
-		sio.savemat('AE_W.mat', {'data' : sent_model.ae.encode_layer.W.get_value()})
-		sio.savemat('AE_b.mat', {'data' : sent_model.ae.encode_layer.b.get_value()})
-		sio.savemat('LM_W.mat', {'data' : sent_model.output_layer.W.get_value()})
-		sio.savemat('LM_b.mat', {'data' : sent_model.output_layer.b.get_value()})
+		pprint('Reconstructed data saved...')
+		sio.savemat('recons_senti_set.mat', {'train' : recons_aug_senti_train_set, 
+											 'test' : recons_aug_senti_test_set})
+		start_time = time.time()
+		func = theano.function(inputs=[sent_model.input], outputs=sent_model.ae.output)
+		inter_aug_senti_train_set = func(aug_senti_train_set)
+		inter_aug_senti_test_set = func(aug_senti_test_set)
+		end_time = time.time()
+		pprint('Intermediate data saved...')
+		sio.savemat('inter_senti_set.mat', {'train' : inter_aug_senti_train_set,
+											'test' : inter_aug_senti_test_set})
+
+	@unittest.skip('Accuracy of sentiment analysis, using softmax with wordvec concatenation: 0.686371 \
+					Accuracy of sentiemnt analysis, using softmax with autoencoder+linear mapping of wordvec: 0.662835 \
+					Accuracy of sentiment analysis, using softmax with autoencoder: 0.654078')
+	def testSentimentAnalysis(self):
+		'''
+		Test the classification accuracy using new learnt representation.
+		'''
+		# Training and test data sets 
+		pprint('Start to load training and test data...')
+		train_set = self.inter['train'].astype(floatX)
+		test_set = self.inter['test'].astype(floatX)
+		train_label = self.train_label
+		test_label = self.test_label
+		# Build softmax Classifier
+		pprint('Build softmax classifier...')
+		input = T.matrix(name='input')
+		label = T.ivector(name='label')
+		learning_rate = T.scalar(name='learning rate')
+		num_in, num_out = 500, 2
+		softmax = SoftmaxLayer(input, (num_in, num_out))
+		lambdas = 1e-5
+		# cost = softmax.NLL_loss(label) + lambdas * softmax.L2_loss()
+		cost = softmax.NLL_loss(label)
+		params = softmax.params
+		gradparams = T.grad(cost, params)
+		updates = []
+		for param, gradparam in zip(params, gradparams):
+			updates.append((param, param-learning_rate*gradparam))
+		objective = theano.function(inputs=[input, label, learning_rate], outputs=cost, updates=updates)
+		# Training
+		nepoch = 5000
+		pprint('Start training...')
+		pprint('Number of total epoches: %d' % nepoch)
+		start_time = time.time() 
+		for i in xrange(nepoch):
+			rate = 2.0 / (1.0 + i/500)
+			# rate = 1.0
+			func_value = objective(train_set, train_label, rate)
+			prediction = softmax.predict(train_set)
+			accuracy = np.sum(prediction == train_label) / float(self.train_size)
+			pprint('epoch %d, cost = %f, accuracy = %f' % (i, func_value, accuracy))
+		end_time = time.time()
+		pprint('Time used to train the softmax classifier: %f minutes' % ((end_time-start_time)/60))
+		# Test
+		prediction = softmax.predict(test_set)
+		accuracy = np.sum(prediction == test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
+
+	def testSentRecovery(self):
+		'''
+		Use trained model to recover the original sentence, similarity computed by 
+		cosine similarity.
+		'''
+		pprint('Sentence recovery in the training set: ')
+		for i, sent in enumerate(self.train_txt):
+		pprint('Sentence recovery in the test set: ')
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
