@@ -46,27 +46,78 @@ class TestOnLarge(unittest.TestCase):
 		# we will set 56 as the maximum length of each sentence
 		self.max_length = 56
 		self.num_sent = len(self.train_txt)
+		self.batch_size = 2000
+		self.nepoch = 5
 		pprint('Time used to load wiki sentences into memory: %f seconds.' % (end_time-start_time))
 		pprint('Number of sentences in the data set: %d' % len(self.train_txt))
 
-	def testBuild(self):
+	def testTrain(self):
 		'''
-		Build data matrix from WordEmbedding and wiki_sentence data file.
+		Train Auto-Encoder + SoftmaxLayer on batch learning mode.
 		'''
-		train_data = np.zeros((self.num_sent, self.max_length*self.word_embedding.embedding_dim()), dtype=floatX)
+		input_dim, hidden_dim = self.max_length * self.word_embedding.embedding_dim(), 500
+		# Build AutoEncoder + SoftmaxLayer
 		start_time = time.time()
-		for i, sent in enumerate(self.train_txt):
-			if (i+1) % 500 == 0:
-				pprint('%d sentences have been processed...' % (i+1))
-			words = sent.split()
-			vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
-			vectors = vectors.flatten()
-			train_data[i, :vectors.shape[0]] = vectors
+		seed = 1991
+		input_matrix = T.matrix(name='input')
+		num_in, num_out = input_dim, hidden_dim
+		act = Activation('tanh')
+		is_denoising, is_sparse = True, False
+		lambda1, mask = 1e-4, 0.5
+		rng = RandomStreams(seed)
+		sent_model = SentModel(input_matrix, (num_in, num_out), act, 
+				is_denoising, is_sparse, lambda1, mask, rng, verbose=True)
 		end_time = time.time()
-		sio.savemat('wiki_sentence.mat', {'data' : train_data})
-		pprint('Time used to store the data matrix: %f minutes.' % ((end_time-start_time)/60.0))
-
-
+		pprint('Time used to build the model: %f seconds.' % (end_time-start_time))
+		# Loading training data and start batch training mode
+		num_batch = self.num_sent / self.batch_size
+		learn_rate = 0.1
+		# Pretraining
+		pprint('Start pretraining...')
+		start_time = time.time()
+		for i in xrange(self.nepoch):
+			# Batch training
+			pprint('Training epoch: %d' % i)
+			for j in xrange(num_batch):
+				train_set = np.zeros((self.batch_size, self.max_length * self.word_embedding.embedding_dim()), dtype=floatX)
+				train_txt = self.train_txt[j*self.batch_size : (j+1)*self.batch_size]
+				for k, sent in enumerate(train_txt):
+					words = sent.split()
+					vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
+					vectors = vectors.flatten()
+					train_set[k, :vectors.shape[0]] = vectors
+				rate = learn_rate
+				cost = sent_model.pretrain(train_set, rate)
+				if (j+1) % 500 == 0:
+					pprint('Training epoch: %d, Number batch: %d, cost = %f' % (i, j, cost))
+			# Saving temporary pretraining model in .gz
+			with gzip.GzipFile('./large_pretrain.sent.gz', 'wb') as fout:
+				cPickle.dump(sent_model, fout)
+		end_time = time.time()
+		pprint('Time used for pretraining: %f minutes.' % ((end_time-start_time)/60.0))
+		# Fine tuning
+		pprint('Start fine-tuning...')
+		start_time = time.time()
+		for i in xrange(self.nepoch):
+			# Batch training
+			pprint('Training epoch: %d' % i)
+			for j in xrange(num_batch):
+				train_set = np.zeros((self.batch_size, self.max_length * self.word_embedding.embedding_dim()), dtype=floatX)
+				train_txt = self.train_txt[j*self.batch_size : (j+1)*self.batch_size]
+				for k, sent in enumerate(train_txt):
+					words = sent.split()
+					vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
+					vectors = vectors.flatten()
+					train_set[k, :vectors.shape[0]] = vectors
+				rate = learn_rate
+				cost = sent_model.finetune(train_set, rate)
+				if (j+1) % 500 == 0:
+					pprint('Training epoch: %d, Number batch: %d, cost = %f' % (i, j, cost))
+			# Saving temporary fine-tuning model in .gz
+			with gzip.GzipFile('./large_finetune.sent.gz', 'wb') as fout:
+				cPickle.dump(sent_model, fout)
+		end_time = time.time()
+		pprint('Time used for fine-tuning: %f minutes.' %((end_time-start_time)/60.0))
 
 
 if __name__ == '__main__':
