@@ -383,13 +383,13 @@ class TestSent(unittest.TestCase):
 		accuracy = np.sum(prediction == test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
+	@unittest.skip('Wait to be implemented...')
 	def testSentRecovery(self):
 		'''
 		Use trained model to recover the original sentence, similarity computed by 
 		cosine similarity.
 		'''
 		pprint('Sentence recovery in the training set: ')
-		for i, sent in enumerate(self.train_txt):
 		pprint('Sentence recovery in the test set: ')
 
 
