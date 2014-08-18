@@ -53,7 +53,7 @@ class TestOnLarge(unittest.TestCase):
 		'''
 		Build data matrix from WordEmbedding and wiki_sentence data file.
 		'''
-		train_data = np.zeros((self.num_sent, self.max_length), dtype=floatX)
+		train_data = np.zeros((self.num_sent, self.max_length*self.word_embedding.embedding_dim()), dtype=floatX)
 		start_time = time.time()
 		for i, sent in enumerate(self.train_txt):
 			if (i+1) % 500 == 0:
