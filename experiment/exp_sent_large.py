@@ -20,7 +20,7 @@ import numpy as np
 
 from logistic import SoftmaxLayer
 from activations import Activation
-from wrodvec import WordEmbedding
+from wordvec import WordEmbedding
 from pprint import pprint
 from utils import floatX
 from mlp import AutoEncoder, DAE, HiddenLayer
