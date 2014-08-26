@@ -30,6 +30,8 @@ from config import CNNConfiger, MLPConfiger
 import warnings
 warnings.filterwarnings('ignore')
 
+theano.config.omp=True
+
 class TestSentiment(unittest.TestCase):
 	def setUp(self):
 		'''
@@ -93,6 +95,8 @@ class TestSentiment(unittest.TestCase):
 		# Shuffle training and test data set
 		train_rand_index = np.random.permutation(train_size)
 		test_rand_index = np.random.permutation(test_size)
+		self.senti_train_txt = list(np.asarray(self.senti_train_txt)[train_rand_index])
+		self.senti_test_txt = list(np.asarray(self.senti_test_txt)[test_rand_index])
 		self.senti_train_set = self.senti_train_set[train_rand_index, :]
 		self.senti_test_set = self.senti_test_set[test_rand_index, :]
 		self.senti_train_label = self.senti_train_label[train_rand_index]
@@ -168,7 +172,7 @@ class TestSentiment(unittest.TestCase):
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
-	@unittest.skip('accuracy @ sigmoid = 0.7104 \
+	@unittest.skip('accuracy @ sigmoid = 0.716639 \
 					accuracy @ tanh = 0.7159 \
 					accuracy @ ReLU = 0.6584~0.7094')
 	def testCNN(self):
@@ -186,6 +190,7 @@ class TestSentiment(unittest.TestCase):
 		start_time = time.time()
 		for i in xrange(configer.nepoch):
 			right_count = 0
+			tot_cost = 0
 			# rate = learn_rate
 			rate = learn_rate / (i/100+1)
 			for j in xrange(num_batches):
@@ -195,9 +200,10 @@ class TestSentiment(unittest.TestCase):
 				cost, accuracy = convnet.train(minibatch, label, rate)
 				prediction = convnet.predict(minibatch)
 				right_count += np.sum(label == prediction)
+				tot_cost += cost
 				# pprint('Epoch %d, batch %d, cost = %f, local accuracy: %f' % (i, j, cost, accuracy))
 			accuracy = right_count / float(self.train_size)
-			pprint('Epoch %d, overall accuracy: %f' % (i, accuracy))
+			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_cost, accuracy))
 			ConvNet.save('./sentiment.cnn', convnet)
 		end_time = time.time()
 		pprint('Time used to train CNN on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
@@ -213,6 +219,7 @@ class TestSentiment(unittest.TestCase):
 		test_accuracy = right_count / float(self.test_size)
 		pprint('Test set accuracy: %f' % test_accuracy)
 
+	# @unittest.skip('Needs to be debugged...')
 	def testCNNwithFineTuning(self):
 		'''
 		Test the performance of CNN with fine-tuning the word-embedding.
@@ -226,7 +233,7 @@ class TestSentiment(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build the architecture of CNN: %f seconds' % (end_time-start_time))
 		# Training
-		learn_rate = 0.5
+		learn_rate = 1
 		batch_size = configer.batch_size
 		num_batches = self.train_size / batch_size
 		start_time = time.time()
@@ -236,6 +243,7 @@ class TestSentiment(unittest.TestCase):
 		# Begin training and fine-tuning the word-embedding matrix
 		for i in xrange(configer.nepoch):
 			right_count = 0
+			tot_cost = 0
 			# rate = learn_rate
 			rate = learn_rate / (i/100+1)
 			for j in xrange(num_batches):
@@ -261,6 +269,7 @@ class TestSentiment(unittest.TestCase):
 				cost, accuracy = convnet.train(minibatch, label, rate)
 				prediction = convnet.predict(minibatch)
 				right_count += np.sum(label == prediction)
+				tot_cost += cost
 				# Fine-tuning for word-vector matrix
 				grad_minibatch = compute_grad_to_input(minibatch, label)
 				grad_minibatch = grad_minibatch.reshape((batch_size, self.word_embedding.embedding_dim()))
@@ -269,19 +278,27 @@ class TestSentiment(unittest.TestCase):
 				grad_minibatch /= minibatch_len[:, np.newaxis]
 				for k, indices in enumerate(minibatch_indices):
 					for l in indices:
-						self.word_embedding._embedding[l, :] -= 0.01 * rate * grad_minibatch[k, :]
+						self.word_embedding._embedding[l, :] -= 0.1 * rate * grad_minibatch[k, :]
 			accuracy = right_count / float(self.train_size)
-			pprint('Epoch %d, overall accuracy: %f' % (i, accuracy))
-			ConvNet.save('./sentiment.cnn', convnet)
-			with gzip.GzipFile('./fine-tune.sentiment.word2vec.gz', 'wb') as fout:
-				cPickle.dump(self.word_embedding, fout)
+			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_cost, accuracy))
+			if (i+1)%100 == 0:
+				ConvNet.save('./sentiment.cnn', convnet)
+				# with gzip.GzipFile('./fine-tune.sentiment.word2vec.gz', 'wb') as fout:
+				# 	cPickle.dump(self.word_embedding, fout)
 		end_time = time.time()
 		pprint('Time used to train CNN on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
 		# Test
 		num_batches = self.test_size / batch_size
 		right_count = 0
 		for i in xrange(num_batches):
-			minibatch = self.senti_test_set[i*batch_size : (i+1)*batch_size, :]
+			minibatch_txt = self.senti_test_txt[i*batch_size : (i+1)*batch_size]
+			minibatch = np.zeros((batch_size, self.word_embedding.embedding_dim()), dtype=floatX)
+			for j, txt in enumerate(minibatch_txt):
+				words = txt.split()
+				words = [word.lower() for word in words]
+				vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
+				minibatch[j, :] = np.mean(vectors, axis=0)
+			# Reshape into the form of input to CNN
 			minibatch = minibatch.reshape((batch_size, 1, configer.image_row, configer.image_col))
 			label = self.senti_test_label[i*batch_size : (i+1)*batch_size]
 			prediction = convnet.predict(minibatch)
