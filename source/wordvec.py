@@ -8,6 +8,8 @@ import os, sys
 import theano
 import utils
 import numpy as np
+import cPickle
+import gzip
 from utils import floatX
 
 class WordEmbedding(object):
@@ -49,7 +51,7 @@ class WordEmbedding(object):
 		try:
 			idx = self._word2index[word]
 		except KeyError:
-			pass
+			idx = self._word2index['unknown']
 		return idx
 
 	def index2word(self, index):
@@ -64,9 +66,5 @@ class WordEmbedding(object):
 		@word: 	String. Return word vector of word if word exists in the dictonary 
 				else return the word embedding of "unknown"
 		'''
-		idx = self._word2index['unknown']
-		try:
-			idx = self._word2index[word]
-		except KeyError:
-			pass
+		idx = self.word2index(word)
 		return self._embedding[idx]

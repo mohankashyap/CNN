@@ -268,10 +268,12 @@ class TestSentiment(unittest.TestCase):
 				grad_minibatch /= minibatch_len[:, np.newaxis]
 				for k, indices in enumerate(minibatch_indices):
 					for l in indices:
-						self.word_embedding._embedding[l, :] += rate * grad_minibatch[k, :]
+						self.word_embedding._embedding[l, :] -= 0.01 * rate * grad_minibatch[k, :]
 			accuracy = right_count / float(self.train_size)
 			pprint('Epoch %d, overall accuracy: %f' % (i, accuracy))
 			ConvNet.save('./sentiment.cnn', convnet)
+			with gzip.GzipFile('./fine-tune.sentiment.word2vec.gz', 'wb') as fout:
+				cPickle.dump(self.word_embedding, fout)
 		end_time = time.time()
 		pprint('Time used to train CNN on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
 		# Test
