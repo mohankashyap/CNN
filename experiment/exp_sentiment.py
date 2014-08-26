@@ -14,6 +14,7 @@ from pprint import pprint
 import theano
 import theano.tensor as T
 import numpy as np
+import csv
 
 from sklearn.naive_bayes import BernoulliNB
 from sklearn.linear_model import LogisticRegression
@@ -25,6 +26,9 @@ from mlp import MLP
 from wordvec import WordEmbedding
 from config import CNNConfiger, MLPConfiger
 
+import warnings
+warnings.filterwarnings('ignore')
+
 class TestSentiment(unittest.TestCase):
 	def setUp(self):
 		'''
@@ -32,23 +36,35 @@ class TestSentiment(unittest.TestCase):
 		in sentiment analysis task, preprocessing.
 		'''
 		np.random.seed(1991)
-		senti_train_set_filename = '../data/sentiment_train_txt.txt'
-		senti_train_label_filename = '../data/sentiment_train_label.txt'
-		senti_test_set_filename = '../data/sentiment_test_txt.txt'
-		senti_test_label_filename = '../data/sentiment_test_label.txt'
+		senti_train_filename = '../data/sentiment-train.txt'
+		senti_test_filename = '../data/sentiment-test.txt'
+		senti_train_txt, senti_train_label = [], []
+		senti_test_txt, senti_test_label = [], []
+		start_time = time.time()
+		# Read training data set
+		with file(senti_train_filename, 'r') as fin:
+			reader = csv.reader(fin, delimiter='|')
+			for txt, label in reader:
+				senti_train_txt.append(txt)
+				senti_train_label.append(int(label))
+		# Read test data set
+		with file(senti_test_filename, 'r') as fin:
+			reader = csv.reader(fin, delimiter='|')
+			for txt, label in reader:
+				senti_test_txt.append(txt)
+				senti_test_label.append(int(label))
+		end_time = time.time()
+		pprint('Time used to load training and test data set: %f seconds.' % (end_time-start_time))
 		embedding_filename = '../data/wiki_embeddings.txt'
 		# Load training/test data sets and wiki-embeddings
 		word_embedding = WordEmbedding(embedding_filename)
-		with file(senti_train_set_filename) as fin:
-			senti_train_txt = fin.readlines()
-		with file(senti_test_set_filename) as fin:
-			senti_test_txt = fin.readlines()
+		start_time = time.time()
 		# Store original text representation
 		self.senti_train_txt = senti_train_txt
 		self.senti_test_txt = senti_test_txt
 		# Word-vector representation
-		self.senti_train_label = np.loadtxt(senti_train_label_filename, dtype=np.int32)
-		self.senti_test_label = np.loadtxt(senti_test_label_filename, dtype=np.int32)
+		self.senti_train_label = np.asarray(senti_train_label, dtype=np.int32)
+		self.senti_test_label = np.asarray(senti_test_label, dtype=np.int32)
 		train_size = len(senti_train_txt)
 		test_size = len(senti_test_txt)
 		# Check size
@@ -80,9 +96,12 @@ class TestSentiment(unittest.TestCase):
 		self.senti_test_set = self.senti_test_set[test_rand_index, :]
 		self.senti_train_label = self.senti_train_label[train_rand_index]
 		self.senti_test_label = self.senti_test_label[test_rand_index]
+		end_time = time.time()
+		pprint('Time used to build initial training and test matrix: %f seconds.' % (end_time-start_time))
 		# Store data
 		self.train_size = train_size
 		self.test_size = test_size
+		self.word_embedding = word_embedding
 
 	@unittest.skip('Without sparsity constraint: accuracy = 0.70717 \
 					With sparsity constraint: accuracy = 0.706623')
@@ -97,8 +116,8 @@ class TestSentiment(unittest.TestCase):
 		num_in, num_out = 50, 2
 		softmax = SoftmaxLayer(input, (num_in, num_out))
 		lambdas = 1e-5
-		cost = softmax.NLL_loss(label) + lambdas * softmax.L2_loss()
-		# cost = softmax.NLL_loss(label)
+		# cost = softmax.NLL_loss(label) + lambdas * softmax.L2_loss()
+		cost = softmax.NLL_loss(label)
 		params = softmax.params
 		gradparams = T.grad(cost, params)
 		updates = []
@@ -123,7 +142,7 @@ class TestSentiment(unittest.TestCase):
 
 	@unittest.skip('accuracy @ sigmoid = 0.7099 \
 					accuracy @ tanh = 0.7104 \
-					accuracy @ ReLU = 0.715380')
+					accuracy @ ReLU = 0.715541')
 	def testMLP(self):
 		'''
 		Sentiment analysis task for sentence representation using MLP, 
@@ -138,7 +157,8 @@ class TestSentiment(unittest.TestCase):
 		# Training
 		start_time = time.time()
 		for i in xrange(configer.nepoch):
-			cost, accuracy = mlpnet.train(self.senti_train_set, self.senti_train_label)
+			rate = 2.0 / ((1.0 + i/500) ** 2)
+			cost, accuracy = mlpnet.train(self.senti_train_set, self.senti_train_label, rate)
 			pprint('epoch %d, cost = %f, accuracy = %f' % (i, cost, accuracy))
 		end_time = time.time()
 		pprint('Time used for training MLP network on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
@@ -192,6 +212,81 @@ class TestSentiment(unittest.TestCase):
 		test_accuracy = right_count / float(self.test_size)
 		pprint('Test set accuracy: %f' % test_accuracy)
 
+	def testCNNwithFineTuning(self):
+		'''
+		Test the performance of CNN with fine-tuning the word-embedding.
+		'''
+		pprint('CNN with fine-tuning experiment')
+		conf_filename = './sentiment_cnn.conf'
+		# Build the architecture of CNN
+		start_time = time.time()
+		configer = CNNConfiger(conf_filename)
+		convnet = ConvNet(configer, verbose=True)
+		end_time = time.time()
+		pprint('Time used to build the architecture of CNN: %f seconds' % (end_time-start_time))
+		# Training
+		learn_rate = 0.5
+		batch_size = configer.batch_size
+		num_batches = self.train_size / batch_size
+		start_time = time.time()
+		# Define function to do the fine-tuning 
+		grad_to_input = T.grad(convnet.cost, convnet.input)
+		compute_grad_to_input = theano.function(inputs=[convnet.input, convnet.truth], outputs=grad_to_input)
+		# Begin training and fine-tuning the word-embedding matrix
+		for i in xrange(configer.nepoch):
+			right_count = 0
+			# rate = learn_rate
+			rate = learn_rate / (i/100+1)
+			for j in xrange(num_batches):
+				# Record the information of each minibatch
+				minibatch_len = list()
+				minibatch_indices = list()
+				# Dynamically building training matrix using current word-embedding matrix
+				minibatch_txt = self.senti_train_txt[j*batch_size : (j+1)*batch_size]
+				minibatch = np.zeros((batch_size, self.word_embedding.embedding_dim()), dtype=floatX)
+				for k, txt in enumerate(minibatch_txt):
+					words = txt.split()
+					words = [word.lower() for word in words]
+					vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
+					minibatch[k, :] = np.mean(vectors, axis=0)
+					# Record the length of each sentence
+					minibatch_len.append(len(words))
+					# Record the index of each word in each sentence
+					minibatch_indices.append([self.word_embedding.word2index(word) for word in words])
+				# Reshape into the form of input to CNN
+				minibatch = minibatch.reshape((batch_size, 1, configer.image_row, configer.image_col))
+				label = self.senti_train_label[j*batch_size : (j+1)*batch_size]
+				# Training 
+				cost, accuracy = convnet.train(minibatch, label, rate)
+				prediction = convnet.predict(minibatch)
+				right_count += np.sum(label == prediction)
+				# Fine-tuning for word-vector matrix
+				grad_minibatch = compute_grad_to_input(minibatch, label)
+				grad_minibatch = grad_minibatch.reshape((batch_size, self.word_embedding.embedding_dim()))
+				# Updating the word2vec matrix
+				minibatch_len = np.asarray(minibatch_len)
+				grad_minibatch /= minibatch_len[:, np.newaxis]
+				for k, indices in enumerate(minibatch_indices):
+					for l in indices:
+						self.word_embedding._embedding[l, :] += rate * grad_minibatch[k, :]
+			accuracy = right_count / float(self.train_size)
+			pprint('Epoch %d, overall accuracy: %f' % (i, accuracy))
+			ConvNet.save('./sentiment.cnn', convnet)
+		end_time = time.time()
+		pprint('Time used to train CNN on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
+		# Test
+		num_batches = self.test_size / batch_size
+		right_count = 0
+		for i in xrange(num_batches):
+			minibatch = self.senti_test_set[i*batch_size : (i+1)*batch_size, :]
+			minibatch = minibatch.reshape((batch_size, 1, configer.image_row, configer.image_col))
+			label = self.senti_test_label[i*batch_size : (i+1)*batch_size]
+			prediction = convnet.predict(minibatch)
+			right_count += np.sum(prediction == label)
+		test_accuracy = right_count / float(self.test_size)
+		pprint('Test set accuracy: %f' % test_accuracy)
+
+	@unittest.skip('Finished...')
 	def testBoGNB(self):
 		'''
 		Test on sentiment analysis task using Naive Bayes classifier 
