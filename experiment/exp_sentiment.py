@@ -15,6 +15,7 @@ import theano
 import theano.tensor as T
 import numpy as np
 import csv
+import gzip
 
 from sklearn.naive_bayes import BernoulliNB
 from sklearn.linear_model import LogisticRegression
