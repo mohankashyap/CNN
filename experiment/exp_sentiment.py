@@ -267,7 +267,7 @@ class TestSentiment(unittest.TestCase):
 		start_time = time.time()
 		# Epoch training
 		for i in xrange(nepoch):
-			rate = 2.0 / (1.0 + i/500)
+			rate = 1e-2 / (1.0 + i/500)
 			# Training
 			func_value = objective(train_batch_sparse, self.senti_train_label, rate)
 			prediction = softmax.predict(train_batch_sparse)
