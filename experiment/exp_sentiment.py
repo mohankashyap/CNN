@@ -14,11 +14,13 @@ from pprint import pprint
 import theano
 import theano.tensor as T
 import numpy as np
+import scipy as sp
 import csv
 import gzip
 
 from sklearn.naive_bayes import BernoulliNB
 from sklearn.linear_model import LogisticRegression
+from scipy.sparse import *
 
 from utils import floatX
 from cnn import ConvNet
@@ -145,6 +147,139 @@ class TestSentiment(unittest.TestCase):
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
+	@unittest.skip('Without sparsity constraint: accuracy = 0.819330')
+	def testSoftmaxWithFineTuning(self):
+		'''
+		Sentiment analysis task with softmax classifier and fine tuning
+		'''
+		input = T.matrix(name='input')
+		label = T.ivector(name='label')
+		learning_rate = T.scalar(name='learning rate')
+		num_in, num_out = 50, 2
+		softmax = SoftmaxLayer(input, (num_in, num_out))
+		lambdas = 1e-5
+		# cost = softmax.NLL_loss(label) + lambdas * softmax.L2_loss()
+		cost = softmax.NLL_loss(label)
+		params = softmax.params
+		gradparams = T.grad(cost, params)
+		updates = []
+		for param, gradparam in zip(params, gradparams):
+			updates.append((param, param-learning_rate*gradparam))
+		objective = theano.function(inputs=[input, label, learning_rate], outputs=cost, updates=updates)
+		grad_to_input = T.grad(cost, input)
+		compute_grad_to_input = theano.function(inputs=[input, label], outputs=grad_to_input)
+		# Training
+		nepoch = 4000
+		start_time = time.time() 
+		# Create sparse representation of input matrix
+		train_batch_sparse = lil_matrix((self.word_embedding.dict_size(), self.train_size), dtype=floatX)
+		for i, sent in enumerate(self.senti_train_txt):
+			words = sent.split()
+			words = [word.lower() for word in words]
+			# Create sparse representation
+			tmp_indices = [self.word_embedding.word2index(word) for word in words]
+			tmp_counts = {ind : tmp_indices.count(ind) for ind in set(tmp_indices)}
+			# Incremental updating
+			train_batch_sparse[tmp_counts.keys(), i] = np.asarray(tmp_counts.values())[:, np.newaxis]
+			train_batch_sparse[tmp_counts.keys(), i] /= len(words)
+		# Convert to csc-based for fast matrix-matrix multiplication
+		train_batch_sparse = csc_matrix(train_batch_sparse)
+		end_time = time.time()
+		pprint('Time used to build the sparse input matrix: %f seconds.' % (end_time-start_time))
+		start_time = time.time()
+		# Epoch training
+		for i in xrange(nepoch):
+			rate = 2.0 / (1.0 + i/500)
+			# Dynamically use current version of word-embedding matrix
+			train_batch = train_batch_sparse.T.dot(self.word_embedding.embedding)
+			# Training
+			func_value = objective(train_batch, self.senti_train_label, rate)
+			prediction = softmax.predict(train_batch)
+			accuracy = np.sum(prediction == self.senti_train_label) / float(self.train_size)
+			pprint('Epoch: %d, total cost: %f, training accuracy: %f' % (i, func_value, accuracy))
+			# Fine-tuning the word-embedding matrix
+			train_batch_grad = compute_grad_to_input(train_batch, self.senti_train_label)
+			self.word_embedding._embedding -= rate * train_batch_sparse.dot(train_batch_grad)
+		end_time = time.time()
+		pprint('Time used to train the softmax classifier with fine-tuning: %f minutes' % ((end_time-start_time)/60))
+		# Test
+		test_batch = np.zeros((self.test_size, self.word_embedding.embedding_dim()), dtype=floatX)
+		for i, sent in enumerate(self.senti_test_txt):
+			words = sent.split()
+			words = [word.lower() for word in words]
+			vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
+			test_batch[i, :] = np.mean(vectors, axis=0)
+		# Evaluation on test set
+		prediction = softmax.predict(test_batch)
+		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
+
+	def testSoftmaxWithRaw(self):
+		'''
+		sentiment analysis task with softmax on raw input
+		'''
+		pprint('In testSoftmaxWithRaw...')
+		input = T.matrix(name='input')
+		label = T.ivector(name='label')
+		learning_rate = T.scalar(name='learning rate')
+		num_in, num_out = self.word_embedding.dict_size(), 2
+		softmax = SoftmaxLayer(input, (num_in, num_out))
+		lambdas = 1e-5
+		# cost = softmax.NLL_loss(label) + lambdas * softmax.L2_loss()
+		cost = softmax.NLL_loss(label)
+		params = softmax.params
+		gradparams = T.grad(cost, params)
+		updates = []
+		for param, gradparam in zip(params, gradparams):
+			updates.append((param, param-learning_rate*gradparam))
+		objective = theano.function(inputs=[input, label, learning_rate], outputs=cost, updates=updates)
+		# Training
+		nepoch = 1000
+		start_time = time.time() 
+		# Create sparse representation of input matrix
+		train_batch_sparse = lil_matrix((self.word_embedding.dict_size(), self.train_size), dtype=floatX)
+		test_batch_sparse = lil_matrix((self.word_embedding.dict_size(), self.test_size), dtype=floatX)
+		# Build sparse training matrix
+		for i, sent in enumerate(self.senti_train_txt):
+			words = sent.split()
+			words = [word.lower() for word in words]
+			# Create sparse representation
+			tmp_indices = [self.word_embedding.word2index(word) for word in words]
+			tmp_counts = {ind : tmp_indices.count(ind) for ind in set(tmp_indices)}
+			# Incremental updating
+			train_batch_sparse[tmp_counts.keys(), i] = np.asarray(tmp_counts.values())[:, np.newaxis]
+			train_batch_sparse[tmp_counts.keys(), i] /= len(words)
+		# Build sparse test matrix
+		for i, sent in enumerate(self.senti_test_txt):
+			words = sent.split()
+			words = [word.lower() for word in words]
+			# Create sparse representation
+			tmp_indices = [self.word_embedding.word2index(word) for word in words]
+			tmp_counts = {ind : tmp_indices.count(ind) for ind in set(tmp_indices)}
+			# Incremental updating
+			test_batch_sparse[tmp_counts.keys(), i] = np.asarray(tmp_counts.values())[:, np.newaxis]
+			test_batch_sparse[tmp_counts.keys(), i] /= len(words)
+		# Convert to csc-based for fast matrix-matrix multiplication
+		train_batch_sparse = train_batch_sparse.todense().T
+		test_batch_sparse = test_batch_sparse.todense().T
+		end_time = time.time()
+		pprint('Time used to build the sparse input matrix: %f seconds.' % (end_time-start_time))
+		start_time = time.time()
+		# Epoch training
+		for i in xrange(nepoch):
+			rate = 2.0 / (1.0 + i/500)
+			# Training
+			func_value = objective(train_batch_sparse, self.senti_train_label, rate)
+			prediction = softmax.predict(train_batch_sparse)
+			accuracy = np.sum(prediction == self.senti_train_label) / float(self.train_size)
+			pprint('Epoch: %d, total cost: %f, training accuracy: %f' % (i, func_value, accuracy))
+		end_time = time.time()
+		pprint('Time used to train the softmax classifier with fine-tuning: %f minutes' % ((end_time-start_time)/60))
+		# Evaluation on test set
+		prediction = softmax.predict(test_batch_sparse)
+		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
+
 	@unittest.skip('accuracy @ sigmoid = 0.7099 \
 					accuracy @ tanh = 0.7104 \
 					accuracy @ ReLU = 0.715541')
@@ -219,7 +354,7 @@ class TestSentiment(unittest.TestCase):
 		test_accuracy = right_count / float(self.test_size)
 		pprint('Test set accuracy: %f' % test_accuracy)
 
-	# @unittest.skip('Needs to be debugged...')
+	@unittest.skip('accuracy @ sigmoid: 0.798745')
 	def testCNNwithFineTuning(self):
 		'''
 		Test the performance of CNN with fine-tuning the word-embedding.
@@ -278,7 +413,7 @@ class TestSentiment(unittest.TestCase):
 				grad_minibatch /= minibatch_len[:, np.newaxis]
 				for k, indices in enumerate(minibatch_indices):
 					for l in indices:
-						self.word_embedding._embedding[l, :] -= 0.1 * rate * grad_minibatch[k, :]
+						self.word_embedding._embedding[l, :] -= 0.01 * rate * grad_minibatch[k, :]
 			accuracy = right_count / float(self.train_size)
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_cost, accuracy))
 			if (i+1)%100 == 0:
