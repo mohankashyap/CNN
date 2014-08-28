@@ -13,6 +13,7 @@ sys.path.append('../source/')
 from pprint import pprint
 import theano
 import theano.tensor as T
+import theano.sparse as tsp
 import numpy as np
 import scipy as sp
 import csv
@@ -234,7 +235,7 @@ class TestSentiment(unittest.TestCase):
 			updates.append((param, param-learning_rate*gradparam))
 		objective = theano.function(inputs=[input, label, learning_rate], outputs=cost, updates=updates)
 		# Training
-		nepoch = 1000
+		nepoch = 4000
 		start_time = time.time() 
 		# Create sparse representation of input matrix
 		train_batch_sparse = lil_matrix((self.word_embedding.dict_size(), self.train_size), dtype=floatX)
@@ -267,7 +268,7 @@ class TestSentiment(unittest.TestCase):
 		start_time = time.time()
 		# Epoch training
 		for i in xrange(nepoch):
-			rate = 1e-2 / (1.0 + i/500)
+			rate = 2.5 / (1.0 + i/500)
 			# Training
 			func_value = objective(train_batch_sparse, self.senti_train_label, rate)
 			prediction = softmax.predict(train_batch_sparse)
@@ -279,6 +280,9 @@ class TestSentiment(unittest.TestCase):
 		prediction = softmax.predict(test_batch_sparse)
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
+		with gzip.GzipFile('raw-softmax.sent.gz', 'wb') as fout:
+			cPickle.dump(softmax, fout)
+		pprint('model saved: raw-softmax.sent.gz')
 
 	@unittest.skip('accuracy @ sigmoid = 0.7099 \
 					accuracy @ tanh = 0.7104 \
