@@ -116,7 +116,8 @@ class TestBRNN(unittest.TestCase):
 				tot_count += accuracy
 				tot_error += cost
 				conf_matrix[train_label, 1-int(accuracy)] += 1
-			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, tot_count/float(self.train_size)))
+			accuracy = (conf_matrix[0, 0] + conf_matrix[1, 1]) / float(np.sum(conf_matrix))
+			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
 			pprint(conf_matrix)
 			pprint('-' * 50)
