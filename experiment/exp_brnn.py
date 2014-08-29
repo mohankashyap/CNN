@@ -31,7 +31,7 @@ class TestBRNN(unittest.TestCase):
 		Load training and test texts and labels 
 		in sentiment analysis task, preprocessing.
 		'''
-		np.random.seed(1991)
+		np.random.seed(42)
 		senti_train_filename = '../data/sentiment-train.txt'
 		senti_test_filename = '../data/sentiment-test.txt'
 		senti_train_txt, senti_train_label = [], []
@@ -102,7 +102,7 @@ class TestBRNN(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
 		n_epoch = 20
-		learn_rate = 0.1
+		learn_rate = 1
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
