@@ -158,3 +158,34 @@ class DAEConfiger(object):
 				lambda1, mask, num_hidden, hiddens)
 
 
+class RNNConfiger(object):
+	'''
+	Class for the configuration of the architecture of RNN.
+	'''
+	def __init__(self, fname):
+		'''
+		@fname: String. File path to the configuration file of MLP.
+		'''
+		self._cf_parser = ConfigParser.ConfigParser()
+		self._cf_parser.read(fname)
+		# Parsing 
+		self.activation, self.num_input, self.num_hidden, \
+		self.lambda1, self.lambda2 = self.parse()
+
+	def get(self, cfg_object, cfg_section):
+		'''
+		@cfg_object: String. Block title.
+		@cfg_section: String. Section title.
+		'''
+		return self._cf_parser.get(cfg_object, cfg_section)
+
+	def parse(self):
+		activation = self._cf_parser.get('functions', 'activations')
+		num_input = self._cf_parser.getint('architecture', 'input')
+		num_hidden = self._cf_parser.getint('architectures', 'hidden')
+		# L1-norm regularization of the penalty function				
+		lambda1 = self._cf_parser.getfloat('parameters', 'lambda1')
+		# L2-norm regularization of the penalty function
+		lambda2 = self._cf_parser.getfloat('parameters', 'lambda2')
+		return (activation, num_input, num_hidden, lambda1, lambda2)
+
