@@ -101,8 +101,8 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
-		n_epoch = 20
-		learn_rate = 1
+		n_epoch = 100
+		learn_rate = 1e-4
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
