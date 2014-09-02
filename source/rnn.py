@@ -133,7 +133,7 @@ class TBRNN(object):
 			return h_t
 		# Forward and backward representation over time
 		self.forward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_start])
-		self.backward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_end])
+		self.backward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_end], go_backwards=True)
 		# Store the final value
 		self.h_start_star = self.forward_h[-1]
 		self.h_end_star = self.backward_h[-1]
@@ -143,9 +143,6 @@ class TBRNN(object):
 		# Build function to show the learned representation for different sentences
 		self.show_forward = theano.function(inputs=[self.input], outputs=self.h_start_star)
 		self.show_backward = theano.function(inputs=[self.input], outputs=self.h_end_star)
-		# # Forward-Backward compression function
-		# self.forward = theano.function(inputs=[self.input], outputs=self.h_start_star)
-		# self.backward = theano.function(inputs=[self.input], outputs=self.h_end_star)
 		##################################################################################
 		# Correlated BRNN
 		##################################################################################
@@ -167,8 +164,7 @@ class TBRNN(object):
 		self.objective = theano.function(inputs=[self.input, self.truth, self.learn_rate], \
 										 outputs=self.cost, updates=self.updates)
 		# Build prediction function
-		self.pred = T.argmax(self.output, axis=1)
-		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
+		self.predict = theano.function(inputs=[self.input], outputs=self.softmax.pred)
 		if verbose:
 			pprint('*' * 50)
 			pprint('Finished constructing Tied weights Bidirectional Recurrent Neural Network (TBRNN)')
