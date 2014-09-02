@@ -79,17 +79,17 @@ class TestBRNN(unittest.TestCase):
 		for i, sent in enumerate(senti_train_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			vectors = np.zeros((len(words)+2, self.word_embedding.embedding_dim()), dtype=floatX)
+			vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()))
 			vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
-			senti_train_len.append(len(words))
+			senti_train_len.append(len(words)+2)
 			self.senti_train_set.append(vectors)
 		# Embedding for test set
 		for i, sent in enumerate(senti_test_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			vectors = np.zeros((len(words)+2, self.word_embedding.embedding_dim()), dtype=floatX)
+			vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()))
 			vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
-			senti_test_len.append(len(words))
+			senti_test_len.append(len(words)+2)
 			self.senti_test_set.append(vectors)
 		assert senti_train_len == [seq.shape[0] for seq in self.senti_train_set]
 		assert senti_test_len == [seq.shape[0] for seq in self.senti_test_set]
