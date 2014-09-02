@@ -181,9 +181,7 @@ class TBRNN(object):
 
 	def train(self, input, truth, learn_rate):
 		cost = self.objective(input, truth, learn_rate)
-		prediction = self.predict(input)
-		accuracy = np.sum(prediction == truth) / float(len(truth))
-		return (cost, accuracy)
+		return cost
 
 	@staticmethod
 	def save(fname, model):

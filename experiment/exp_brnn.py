@@ -121,13 +121,11 @@ class TestBRNN(unittest.TestCase):
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
-				cost, accuracy = brnn.train(train_seq, [train_label], learn_rate)
-				tot_count += accuracy
+				cost = brnn.train(train_seq, [train_label], learn_rate)
 				tot_error += cost
-				if train_label == 0:
-					conf_matrix[0, 1-int(accuracy)] += 1
-				else:
-					conf_matrix[1, int(accuracy)] += 1
+				prediction = brnn.predict(train_seq)[0]
+				tot_count += prediction == train_label
+				conf_matrix[train_label, prediction] += 1
 				# grads = brnn.check_gradient(train_seq, [train_label])
 				# pprint('-' * 50)
 			accuracy = tot_count / float(self.train_size)
@@ -140,7 +138,7 @@ class TestBRNN(unittest.TestCase):
 		# Testing
 		tot_count = 0
 		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
-			prediction = brnn.predict(test_seq)
+			prediction = brnn.predict(test_seq)[0]
 			tot_count += test_label == prediction
 		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
 		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
