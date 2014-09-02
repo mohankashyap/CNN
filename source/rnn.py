@@ -178,6 +178,9 @@ class TBRNN(object):
 		self.params.extend([self.W_1, self.W_2, self.b_softmax])
 		# Minimize the negative log-likelihood objective function
 		self.cost = -T.mean(T.log(self.output)[T.arange(self.truth.shape[0]), self.truth])
+		# Regularization to RNN
+		if configs.regularization:
+			self.cost += configs.lambda1 * self.L2_norm
 		# Compute gradient
 		self.gradparams = T.grad(self.cost, self.params)
 		self.updates = []

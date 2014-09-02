@@ -108,7 +108,7 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
-		n_epoch = 10
+		n_epoch = 20
 		learn_rate = 1e-4
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
@@ -160,7 +160,7 @@ class TestBRNN(unittest.TestCase):
 									   'test_forward' : test_forward_rep, 
 									   'test_backward' : test_backward_rep})
 		# Save BRNN
-		TBRNN.save('sentiment.brnn', brnn)
+		TBRNN.save('sentiment.brnn.pkl', brnn)
 		pprint('Model successfully saved...')
 
 

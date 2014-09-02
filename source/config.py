@@ -170,7 +170,7 @@ class RNNConfiger(object):
 		self._cf_parser.read(fname)
 		# Parsing 
 		self.activation, self.num_input, self.num_hidden, self.num_class, \
-		self.lambda1, self.lambda2 = self.parse()
+		self.regularization, self.lambda1, self.lambda2 = self.parse()
 
 	def get(self, cfg_object, cfg_section):
 		'''
@@ -184,9 +184,11 @@ class RNNConfiger(object):
 		num_input = self._cf_parser.getint('architectures', 'input')
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
 		num_class = self._cf_parser.getint('architectures', 'class')
+		regularization = self._cf_parser.getint('parameters', 'regularization')
 		# L1-norm regularization of the penalty function				
 		lambda1 = self._cf_parser.getfloat('parameters', 'lambda1')
 		# L2-norm regularization of the penalty function
 		lambda2 = self._cf_parser.getfloat('parameters', 'lambda2')
-		return (activation, num_input, num_hidden, num_class, lambda1, lambda2)
+		return (activation, num_input, num_hidden, num_class, \
+				regularization, lambda1, lambda2)
 
