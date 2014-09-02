@@ -192,6 +192,20 @@ class TBRNN(object):
 		# Build prediction function
 		self.pred = T.argmax(self.output, axis=1)
 		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
+		if verbose:
+			pprint('*' * 50)
+			pprint('Finished constructing Tied weights Bidirectional Recurrent Neural Network (TBRNN)')
+			pprint('Size of input dimension: %d' % configs.num_input)
+			pprint('Size of hidden/recurrent dimension: %d' % configs.num_hidden)
+			pprint('Size of output dimension: %d' % configs.num_class)
+			pprint('Is regularization applied? %s' % ('yes' if configs.regularization else 'no'))
+			if configs.regularization:
+				pprint('Coefficient of regularization term: %f' % configs.lambda1)
+			pprint('*' * 50)
+		# Check gradient
+		self.check_gradient = theano.function(inputs=[self.input, self.truth], 
+											  outputs=self.gradparams)
+		
 
 	def train(self, input, truth, learn_rate):
 		cost = self.objective(input, truth, learn_rate)
