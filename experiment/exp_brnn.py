@@ -20,6 +20,7 @@ sys.path.append('../source/')
 from rnn import RNN, TBRNN
 from config import RNNConfiger
 from wordvec import WordEmbedding
+from logistic import SoftmaxLayer
 
 
 class TestBRNN(unittest.TestCase):
@@ -101,6 +102,7 @@ class TestBRNN(unittest.TestCase):
 		self.test_size = test_size
 		self.word_embedding = word_embedding
 
+	# @unittest.skip('Wait a minute')
 	def testBRNNonSentiment(self):
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
@@ -129,7 +131,6 @@ class TestBRNN(unittest.TestCase):
 				# grads = brnn.check_gradient(train_seq, [train_label])
 				# pprint('-' * 50)
 			accuracy = tot_count / float(self.train_size)
-			tot_error /= self.train_size
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
 			pprint(conf_matrix)
@@ -144,6 +145,12 @@ class TestBRNN(unittest.TestCase):
 		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
 		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
 		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		# Re-testing on training set
+		tot_count = 0
+		for train_seq, train_label in zip(self.senti_train_set, self.senti_test_label):
+			prediction = brnn.predict(train_seq)
+			tot_count += train_label == prediction
+		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
 		# Show representation for training inputs and testing inputs
 		start_time = time.time()
 		training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
@@ -165,6 +172,65 @@ class TestBRNN(unittest.TestCase):
 		# Save BRNN
 		TBRNN.save('sentiment.brnn.pkl', brnn)
 		pprint('Model successfully saved...')
+
+	@unittest.skip('skip')
+	def testSoftmaxWithLearned(self):
+		data = sio.loadmat('./BRNN-rep.mat')
+		train_data = np.hstack((data['training_forward'], data['training_backward']))
+		test_data = np.hstack((data['test_forward'], data['test_backward']))
+		pprint('Training matrix dimension: ')
+		pprint(train_data.shape)
+		pprint('Test matrix dimension: ')
+		pprint(test_data.shape)
+		input = T.matrix(name='input')
+		truth = T.ivector(name='label')
+		learn_rate = T.scalar(name='learning rate')
+		softmax = SoftmaxLayer(input, (100, 2))
+		cost = softmax.NLL_loss(truth)
+		params = softmax.params
+		gradparams = T.grad(cost, params)
+		updates = []
+		for param, gradparam in zip(params, gradparams):
+			updates.append((param, param-learn_rate*gradparam))
+		train = theano.function(inputs=[input, truth, learn_rate], outputs=cost, 
+								updates=updates)
+		nepoch = 20000
+		rate = 1e-1
+		start_time = time.time()
+		for i in xrange(nepoch):
+			tot_cost = train(train_data, self.senti_train_label, rate)
+			prediction = softmax.predict(train_data)
+			accuracy = np.sum(prediction == self.senti_train_label) / float(self.train_size)
+			pprint('Epoch %d, total error: %f, accuracy: %f' % (i, tot_cost, accuracy))
+		end_time = time.time()
+		pprint('Time used for training: %f' % (end_time-start_time))
+		# Testing
+		prediction = softmax.predict(test_data)
+		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
+
+	@unittest.skip('bug found!')
+	def testResult(self):
+		data = sio.loadmat('./BRNN-rep.mat')
+		train_data = np.hstack((data['training_forward'], data['training_backward']))
+		test_data = np.hstack((data['test_forward'], data['test_backward']))
+		pprint('Training matrix dimension: ')
+		pprint(train_data.shape)
+		pprint('Test matrix dimension: ')
+		pprint(test_data.shape)
+		start_time = time.time()
+		brnn = TBRNN.load('sentiment.brnn.pkl')
+		W = brnn.softmax.W.get_value(borrow=True)
+		b = brnn.softmax.b.get_value(borrow=True)
+		end_time = time.time()
+		tmp_softmax = np.dot(train_data, W) + b
+		tmp_train_label = np.argmax(tmp_softmax, axis=1)
+		accuracy = np.sum(tmp_train_label == self.senti_train_label) / float(self.train_size)
+		pprint('Training accuracy: %f' % accuracy)
+		tmp_softmax = np.dot(test_data, W) + b
+		tmp_test_label = np.argmax(tmp_softmax, axis=1)
+		accuracy = np.sum(tmp_test_label == self.senti_test_label) / float(self.test_size)
+		pprint('Test accuracy: %f' % accuracy)
 
 
 if __name__ == '__main__':
