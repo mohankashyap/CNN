@@ -120,11 +120,11 @@ class TBRNN(object):
 					name='U', borrow=True)
 		# Bias parameter for the hidden-layer encoder of RNN
 		self.b = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='b', borrow=True)
-		# h[0], zero vector
+		# h[0], zero vector, treated as constants
 		self.h_start = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='h_start', borrow=True)
 		self.h_end = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='h_end', borrow=True)
 		# Save all the parameters
-		self.params = [self.W, self.U, self.b, self.h_start, self.h_end]
+		self.params = [self.W, self.U, self.b]
 		# recurrent function used to compress a sequence of input vectors
 		# the first dimension should correspond to time
 		def step(x_t, h_tm1):
@@ -149,36 +149,13 @@ class TBRNN(object):
 		##################################################################################
 		# Correlated BRNN
 		##################################################################################
-		# # Concatenate these two vectors into one
-		# self.h = T.concatenate([self.h_start_star, self.h_end_star], axis=0)
-		# # Use concatenated vector as input to the Softmax/MLP classifier
-		# self.softmax = SoftmaxLayer(self.h, (2*configs.num_hidden, configs.num_class))
-		# self.params.extend(self.softmax.params)
-		# # Build cost function
-		# self.cost = self.softmax.NLL_loss(self.truth)
-		##################################################################################
-		# Uncorrelated BRNN
-		##################################################################################
-		# Softmax for forward encoding
-		self.W_1 = theano.shared(value=np.asarray(
-			np.random.uniform(low=-np.sqrt(6.0/(configs.num_hidden+configs.num_class)),
-							  high=np.sqrt(6.0/(configs.num_hidden+configs.num_class)),
-							  size=(configs.num_hidden, configs.num_class)), dtype=floatX),
-			name='W_1', borrow=True)
-		# Softmax for backward encoding
-		self.W_2 = theano.shared(value=np.asarray(
-			np.random.uniform(low=-np.sqrt(6.0/(configs.num_hidden+configs.num_class)),
-							  high=np.sqrt(6.0/(configs.num_hidden+configs.num_class)),
-							  size=(configs.num_hidden, configs.num_class)), dtype=floatX),
-			name='W_2', borrow=True)
-		self.b_softmax = theano.shared(value=np.zeros(configs.num_class, dtype=floatX), name='b_softmax', borrow=True)
-		# Build classifier 
-		self.output = T.nnet.softmax(T.dot(self.h_start_star, self.W_1) + T.dot(self.h_end_star, self.W_2) + self.b_softmax)
-		# Extend parameters
-		self.params.extend([self.W_1, self.W_2, self.b_softmax])
-		# Minimize the negative log-likelihood objective function
-		self.cost = -T.mean(T.log(self.output)[T.arange(self.truth.shape[0]), self.truth])
-		# Regularization to RNN
+		# Concatenate these two vectors into one
+		self.h = T.concatenate([self.h_start_star, self.h_end_star], axis=0)
+		# Use concatenated vector as input to the Softmax/MLP classifier
+		self.softmax = SoftmaxLayer(self.h, (2*configs.num_hidden, configs.num_class))
+		self.params.extend(self.softmax.params)
+		# Build cost function
+		self.cost = self.softmax.NLL_loss(self.truth)
 		if configs.regularization:
 			self.cost += configs.lambda1 * self.L2_norm
 		# Compute gradient
@@ -202,10 +179,9 @@ class TBRNN(object):
 			if configs.regularization:
 				pprint('Coefficient of regularization term: %f' % configs.lambda1)
 			pprint('*' * 50)
-		# Check gradient
+		# Checking some important variables
 		self.check_gradient = theano.function(inputs=[self.input, self.truth], 
 											  outputs=self.gradparams)
-		
 
 	def train(self, input, truth, learn_rate):
 		cost = self.objective(input, truth, learn_rate)

@@ -109,7 +109,7 @@ class TestBRNN(unittest.TestCase):
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
 		n_epoch = 1
-		learn_rate = 1e-4
+		learn_rate = 1
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
@@ -126,10 +126,8 @@ class TestBRNN(unittest.TestCase):
 					conf_matrix[0, 1-int(accuracy)] += 1
 				else:
 					conf_matrix[1, int(accuracy)] += 1
-				grads = brnn.check_gradient(train_seq, [train_label])
-				pprint('Gradients: ')
-				pprint(grads)
-				pprint('-' * 50)
+				# grads = brnn.check_gradient(train_seq, [train_label])
+				# pprint('-' * 50)
 			accuracy = tot_count / float(self.train_size)
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
