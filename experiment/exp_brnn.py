@@ -145,8 +145,8 @@ class TestBRNN(unittest.TestCase):
 		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
 		# Re-testing on training set
 		tot_count = 0
-		for train_seq, train_label in zip(self.senti_train_set, self.senti_test_label):
-			prediction = brnn.predict(train_seq)
+		for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
 		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
 		# Show representation for training inputs and testing inputs
