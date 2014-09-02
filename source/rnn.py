@@ -163,6 +163,9 @@ class TBRNN(object):
 		# Build objective function
 		self.objective = theano.function(inputs=[self.input, self.truth, self.learn_rate], \
 										 outputs=self.cost, updates=self.updates)
+		# Compute the gradients
+		self.compute_gradient = theano.function(inputs=[self.input, self.truth], 
+												outputs=self.gradparams)
 		# Build prediction function
 		self.predict = theano.function(inputs=[self.input], outputs=self.softmax.pred)
 		if verbose:
@@ -182,6 +185,12 @@ class TBRNN(object):
 	def train(self, input, truth, learn_rate):
 		cost = self.objective(input, truth, learn_rate)
 		return cost
+
+	# This method is used to implement the batch updating algorithm
+	def update_params(self, gradparams, learn_rate):
+		for param, gradparam in zip(self.params, gradparams):
+			# Updating using stochastic gradient descent
+			param.set_value(param.get_value(borrow=True)-learn_rate*gradparam)
 
 	@staticmethod
 	def save(fname, model):
