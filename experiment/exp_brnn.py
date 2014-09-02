@@ -8,6 +8,7 @@
 import os, sys
 import csv
 import numpy as np
+import scipy.io as sio
 import theano
 import theano.tensor as T
 import time
@@ -107,7 +108,7 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
-		n_epoch = 200
+		n_epoch = 10
 		learn_rate = 1e-4
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
@@ -115,7 +116,7 @@ class TestBRNN(unittest.TestCase):
 		start_time = time.time()
 		for i in xrange(n_epoch):
 			tot_count = 0
-			tot_error = 0.0			
+			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 				cost, accuracy = brnn.train(train_seq, [train_label], learn_rate)
@@ -137,8 +138,30 @@ class TestBRNN(unittest.TestCase):
 		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
 			prediction = brnn.predict(test_seq)
 			tot_count += test_label == prediction
-		pprint('Test accuracy: %f' % (tot_count / float(self.test_size))) 
-
+		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
+		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		# Show representation for training inputs and testing inputs
+		start_time = time.time()
+		training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
+		test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
+		training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
+		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
+		for i, train_seq in enumerate(self.senti_train_set):
+			training_forward_rep[i, :] = brnn.show_forward(train_seq)
+			training_backward_rep[i, :] = brnn.show_backward(train_seq)
+		for i, test_seq in enumerate(self.senti_test_set):
+			test_forward_rep[i, :] = brnn.show_forward(test_seq)
+			test_backward_rep[i, :] = brnn.show_backward(test_seq)
+		end_time = time.time()
+		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
+		sio.savemat('./BRNN-rep.mat', {'training_forward' : training_forward_rep, 
+									   'training_backward' : training_backward_rep, 
+									   'test_forward' : test_forward_rep, 
+									   'test_backward' : test_backward_rep})
+		# Save BRNN
+		TBRNN.save('sentiment.brnn', brnn)
+		pprint('Model successfully saved...')
 
 
 if __name__ == '__main__':
