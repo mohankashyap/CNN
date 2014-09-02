@@ -55,6 +55,10 @@ class TestBRNN(unittest.TestCase):
 		# Load training/test data sets and wiki-embeddings
 		word_embedding = WordEmbedding(embedding_filename)
 		start_time = time.time()
+		# Starting and Ending token for each sentence
+		self.blank_token = word_embedding.wordvec('</s>')
+		pprint('Blank token: ')
+		pprint(self.blank_token)
 		# Store original text representation
 		self.senti_train_txt = senti_train_txt
 		self.senti_test_txt = senti_test_txt
@@ -75,14 +79,16 @@ class TestBRNN(unittest.TestCase):
 		for i, sent in enumerate(senti_train_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			vectors = np.asarray([word_embedding.wordvec(word) for word in words])
+			vectors = np.zeros((len(words)+2, self.word_embedding.embedding_dim()), dtype=floatX)
+			vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
 			senti_train_len.append(len(words))
 			self.senti_train_set.append(vectors)
 		# Embedding for test set
 		for i, sent in enumerate(senti_test_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			vectors = np.asarray([word_embedding.wordvec(word) for word in words])
+			vectors = np.zeros((len(words)+2, self.word_embedding.embedding_dim()), dtype=floatX)
+			vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
 			senti_test_len.append(len(words))
 			self.senti_test_set.append(vectors)
 		assert senti_train_len == [seq.shape[0] for seq in self.senti_train_set]
@@ -101,7 +107,7 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
-		n_epoch = 100
+		n_epoch = 200
 		learn_rate = 1e-4
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
