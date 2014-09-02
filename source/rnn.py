@@ -124,8 +124,7 @@ class TBRNN(object):
 		self.h_start = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='h_start', borrow=True)
 		self.h_end = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='h_end', borrow=True)
 		# Save all the parameters
-		# self.params = [self.W, self.U, self.b, self.h_start, self.h_end]
-		self.params = []
+		self.params = [self.W, self.U, self.b, self.h_start, self.h_end]
 		# recurrent function used to compress a sequence of input vectors
 		# the first dimension should correspond to time
 		def step(x_t, h_tm1):
