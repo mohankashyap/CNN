@@ -104,14 +104,17 @@ class TestBRNN(unittest.TestCase):
 
 	# @unittest.skip('Wait a minute')
 	def testBRNNonSentiment(self):
+		# Set print precision
+		np.set_printoptions(threshold=np.nan)
+
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
 		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
-		n_epoch = 20
-		learn_rate = 1e-2
+		n_epoch = 100
+		learn_rate = 1
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
@@ -120,26 +123,25 @@ class TestBRNN(unittest.TestCase):
 			tot_count = 0
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
-			tot_grads = []
+			tot_grads = np.zeros(brnn.num_params)
+			pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
 			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 				# cost = brnn.train(train_seq, [train_label], learn_rate)
-				current_grads = brnn.compute_gradient(train_seq, [train_label])
-				for tot_grad, current_grad in zip(tot_grads, current_grads):
-					tot_grad += current_grad
+				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
+				tot_grads += current_grads
 				tot_error += cost
 				prediction = brnn.predict(train_seq)[0]
 				tot_count += prediction == train_label
 				conf_matrix[train_label, prediction] += 1
-				# grads = brnn.check_gradient(train_seq, [train_label])
-				# pprint('-' * 50)
 			# Batch updating 
-			for tot_grad in tot_grads:
-				tot_grad /= self.train_size
+			tot_grads /= self.train_size
 			brnn.update_params(tot_grads, learn_rate)
 			accuracy = tot_count / float(self.train_size)
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
 			pprint(conf_matrix)
+			# pprint('Gradient vector: ')
+			# pprint(tot_grads)
 			pprint('-' * 50)
 		end_time = time.time()
 		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
