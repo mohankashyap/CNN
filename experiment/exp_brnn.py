@@ -143,6 +143,18 @@ class TestBRNN(unittest.TestCase):
 			# pprint('Gradient vector: ')
 			# pprint(tot_grads)
 			pprint('-' * 50)
+			if (i+1) % 100 == 0:
+				pprint('=' * 50)
+				pprint('Test at epoch: %d' % i)
+				# Testing
+				tot_count = 0
+				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+					prediction = brnn.predict(test_seq)[0]
+					tot_count += test_label == prediction
+				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
+				pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+				pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+				pprint('=' * 50)
 		end_time = time.time()
 		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
