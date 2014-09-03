@@ -144,7 +144,6 @@ class TestBRNN(unittest.TestCase):
 			# Batch updating 
 			tot_grads /= self.train_size
 			# Update historical gradient vector
-			# history_grads += tot_grads ** 2
 			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
 			brnn.update_params(adjusted_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
@@ -152,8 +151,6 @@ class TestBRNN(unittest.TestCase):
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
 			pprint(conf_matrix)
-			# pprint('Gradient vector: ')
-			# pprint(tot_grads)
 			pprint('-' * 50)
 			if (i+1) % 100 == 0:
 				pprint('=' * 50)
