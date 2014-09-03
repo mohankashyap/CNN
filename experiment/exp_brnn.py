@@ -121,7 +121,7 @@ class TestBRNN(unittest.TestCase):
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		history_grads = np.zeros(brnn.num_params)
-		n_epoch = 1000
+		n_epoch = 2000
 		learn_rate = 1
 		fudge_factor = 1e-6
 		for i in xrange(n_epoch):
