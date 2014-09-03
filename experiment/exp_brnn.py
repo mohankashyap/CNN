@@ -114,12 +114,15 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
-		n_epoch = 1000
-		learn_rate = 1e-1
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
+		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
+		history_grads = np.zeros(brnn.num_params)
+		n_epoch = 1000
+		learn_rate = 1
+		fudge_factor = 1e-6
 		for i in xrange(n_epoch):
 			tot_count = 0
 			tot_error = 0.0
@@ -136,7 +139,11 @@ class TestBRNN(unittest.TestCase):
 				conf_matrix[train_label, prediction] += 1
 			# Batch updating 
 			tot_grads /= self.train_size
-			brnn.update_params(tot_grads, learn_rate)
+			# Update historical gradient vector
+			history_grads += tot_grads ** 2
+			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
+			brnn.update_params(adjusted_grads, learn_rate)
+			# End of the core AdaGrad updating algorithm
 			accuracy = tot_count / float(self.train_size)
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
