@@ -134,13 +134,16 @@ class TestBRNN(unittest.TestCase):
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
 				tot_grads += current_grads
 				tot_error += cost
+				# historical gradient accumulation
+				history_grads += current_grads ** 2
+				# predict current training label
 				prediction = brnn.predict(train_seq)[0]
 				tot_count += prediction == train_label
 				conf_matrix[train_label, prediction] += 1
 			# Batch updating 
 			tot_grads /= self.train_size
 			# Update historical gradient vector
-			history_grads += tot_grads ** 2
+			# history_grads += tot_grads ** 2
 			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
 			brnn.update_params(adjusted_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
