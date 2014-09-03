@@ -111,7 +111,8 @@ class TestBRNN(unittest.TestCase):
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		brnn = TBRNN(configer, verbose=True)
+		# brnn = TBRNN(configer, verbose=True)
+		brnn = TBRNN.load('sentiment.brnn.adagrad.pkl')
 		end_time = time.time()
 		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
 		# Training
