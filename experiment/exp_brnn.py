@@ -61,8 +61,6 @@ class TestBRNN(unittest.TestCase):
 		start_time = time.time()
 		# Starting and Ending token for each sentence
 		self.blank_token = word_embedding.wordvec('</s>')
-		pprint('Blank token: ')
-		pprint(self.blank_token)
 		# Store original text representation
 		self.senti_train_txt = senti_train_txt
 		self.senti_test_txt = senti_test_txt
