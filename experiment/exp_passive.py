@@ -107,15 +107,15 @@ class TestRNNSP(unittest.TestCase):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
 
-		config_filename = './sentiment_brnn.conf'
+		config_filename = './sp_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
 		brnn = BRNN(configer, verbose=True)
 		end_time = time.time()
 		pprint('Time used to build BRNN: %f seconds.' % (end_time-start_time))
 		# Training
-		pprint('positive labels: %d' % np.sum(self.senti_train_label))
-		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
+		pprint('positive labels: %d' % np.sum(self.sp_train_label))
+		pprint('negative labels: %d' % (self.sp_train_label.shape[0]-np.sum(self.sp_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		history_grads = np.zeros(brnn.num_params)
@@ -128,7 +128,7 @@ class TestRNNSP(unittest.TestCase):
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params)
 			pprint('Total number of parameters in BRNN: %d' % brnn.num_params)
-			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+			for train_seq, train_label in zip(self.sp_train_set, self.sp_train_label):
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
 				tot_grads += current_grads
 				tot_error += cost
@@ -154,26 +154,26 @@ class TestRNNSP(unittest.TestCase):
 				pprint('Test at epoch: %d' % i)
 				# Testing
 				tot_count = 0
-				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+				for test_seq, test_label in zip(self.sp_test_set, self.sp_test_label):
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
 				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-				pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-				pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+				pprint('Percentage of positive in Test data: %f' % (np.sum(self.sp_test_label==1) / float(self.test_size)))
+				pprint('Percentage of negative in Test data: %f' % (np.sum(self.sp_test_label==0) / float(self.test_size)))
 				pprint('=' * 50)
 		end_time = time.time()
 		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
 		tot_count = 0
-		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+		for test_seq, test_label in zip(self.sp_test_set, self.sp_test_label):
 			prediction = brnn.predict(test_seq)[0]
 			tot_count += test_label == prediction
 		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		pprint('Percentage of positive in Test data: %f' % (np.sum(self.sp_test_label==1) / float(self.test_size)))
+		pprint('Percentage of negative in Test data: %f' % (np.sum(self.sp_test_label==0) / float(self.test_size)))
 		# Re-testing on training set
 		tot_count = 0
-		for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+		for train_seq, train_label in zip(self.sp_train_set, self.sp_train_label):
 			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
 		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
@@ -183,20 +183,20 @@ class TestRNNSP(unittest.TestCase):
 		test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
 		training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
 		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
-		for i, train_seq in enumerate(self.senti_train_set):
+		for i, train_seq in enumerate(self.sp_train_set):
 			training_forward_rep[i, :] = brnn.show_forward(train_seq)
 			training_backward_rep[i, :] = brnn.show_backward(train_seq)
-		for i, test_seq in enumerate(self.senti_test_set):
+		for i, test_seq in enumerate(self.sp_test_set):
 			test_forward_rep[i, :] = brnn.show_forward(test_seq)
 			test_backward_rep[i, :] = brnn.show_backward(test_seq)
 		end_time = time.time()
 		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-		sio.savemat('./nBRNN-rep.mat', {'training_forward' : training_forward_rep, 
+		sio.savemat('./sp-BRNN-rep.mat', {'training_forward' : training_forward_rep, 
 									   'training_backward' : training_backward_rep, 
 									   'test_forward' : test_forward_rep, 
 									   'test_backward' : test_backward_rep})
 		# Save TBRNN
-		TBRNN.save('sentiment.nbrnn.pkl', brnn)
+		TBRNN.save('sp.nbrnn.pkl', brnn)
 		pprint('Model successfully saved...')
 
 
