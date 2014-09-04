@@ -288,7 +288,7 @@ class BRNN(object):
 		b_forward_init = np.zeros(num_hidden, dtype=floatX)		
 		param_idx += num_hidden
 		# 3, Bias parameter for the hidden-layer backward direction RNN
-		self.b_backward = self.theta[pram_idx: param_idx+num_hidden]
+		self.b_backward = self.theta[param_idx: param_idx+num_hidden]
 		self.b_backward.name = 'b_backward_RNN'
 		b_backward_init = np.zeros(num_hidden, dtype=floatX)
 		param_idx += num_hidden
@@ -307,7 +307,7 @@ class BRNN(object):
 		# Set all the default parameters into theta
 		self.theta.set_value(np.concatenate([x.ravel() for x in 
 			(W_forward_init, W_backward_init, U_forward_init, U_backward_init, 
-			 b_forwrad_init, b_backward_init, W_softmax_init, b_softmax_init)]))
+			 b_forward_init, b_backward_init, W_softmax_init, b_softmax_init)]))
 		assert param_idx == num_params
 		# h[0], zero vector, treated as constants
 		self.h_start = theano.shared(value=np.zeros(num_hidden, dtype=floatX), name='h_start', borrow=True)
@@ -329,8 +329,12 @@ class BRNN(object):
 		self.h_start_star = self.forward_h[-1]
 		self.h_end_star = self.backward_h[-1]
 		# L1, L2 regularization
-		self.L1_norm = T.sum(T.abs_(self.W) + T.abs_(self.U) + T.abs_(self.W_softmax))
-		self.L2_norm = T.sum(self.W ** 2) + T.sum(self.U ** 2) + T.sum(self.W_softmax ** 2)
+		self.L1_norm = T.sum(T.abs_(self.W_forward) + T.abs_(self.W_backward) + \
+							 T.abs_(self.U_forward) + T.abs_(self.U_backward) + \
+							 T.abs_(self.W_softmax))
+		self.L2_norm = T.sum(self.W_forward ** 2) + T.sum(self.W_backward ** 2) + \
+					   T.sum(self.U_forward ** 2) + T.sum(self.U_backward ** 2) + \
+					   T.sum(self.W_softmax ** 2)
 		# Build function to show the learned representation for different sentences
 		self.show_forward = theano.function(inputs=[self.input], outputs=self.h_start_star)
 		self.show_backward = theano.function(inputs=[self.input], outputs=self.h_end_star)
