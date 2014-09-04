@@ -17,7 +17,7 @@ import unittest
 from pprint import pprint
 
 sys.path.append('../source/')
-from rnn import RNN, TBRNN
+from rnn import RNN, TBRNN, BRNN
 from config import RNNConfiger
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer
