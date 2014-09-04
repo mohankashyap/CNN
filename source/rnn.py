@@ -367,7 +367,7 @@ class BRNN(object):
 			pprint('Is regularization applied? %s' % ('yes' if configs.regularization else 'no'))
 			if configs.regularization:
 				pprint('Coefficient of regularization term: %f' % configs.lambda1)
-			pprint('Number of free parameters in TBRNN: %d' % self.num_params)
+			pprint('Number of free parameters in BRNN: %d' % self.num_params)
 			pprint('*' * 50)
 
 	def train(self, input, truth, learn_rate):
