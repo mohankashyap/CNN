@@ -35,7 +35,7 @@ class TestRNNSP(unittest.TestCase):
 		Load training and test data set, also, loading word-embeddings.
 		'''
 		np.random.seed(1991)
-		sp_train_filename = '../data/refined_tarin_sp.txt'
+		sp_train_filename = '../data/refined_train_sp.txt'
 		sp_test_filename = '../data/refined_test_sp.txt'
 		sp_train_txt, sp_train_label = [], []
 		sp_test_txt, sp_test_label = [], []
@@ -51,7 +51,7 @@ class TestRNNSP(unittest.TestCase):
 			reader = csv.reader(fin, delimiter='|')
 			for txt, label in reader:
 				sp_test_txt.append(txt)
-				sp_text_label.append(label)
+				sp_test_label.append(label)
 		end_time = time.time()
 		pprint('Finished loading training and test data sets...')
 		pprint('Time used for loading: %f seconds.' % (end_time-start_time))
