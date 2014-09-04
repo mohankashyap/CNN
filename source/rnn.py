@@ -140,7 +140,7 @@ class TBRNN(object):
 		self.W_softmax.name = 'W_softmax'
 		W_softmax_init = np.asarray(np.random.uniform(low=-np.sqrt(6.0/(2*num_hidden+num_class)), 
 													  high=np.sqrt(6.0/(2*num_hidden+num_class)),
-													  size=(2*num_input, num_class)), dtype=floatX)
+													  size=(2*num_hidden, num_class)), dtype=floatX)
 		param_idx += 2*num_hidden*num_class
 		# Bias vector for softmax function
 		self.b_softmax = self.theta[param_idx: param_idx+num_class]
@@ -297,7 +297,7 @@ class BRNN(object):
 		self.W_softmax.name = 'W_softmax'
 		W_softmax_init = np.asarray(np.random.uniform(low=-np.sqrt(6.0/(2*num_hidden+num_class)), 
 													  high=np.sqrt(6.0/(2*num_hidden+num_class)),
-													  size=(2*num_input, num_class)), dtype=floatX)
+													  size=(2*num_hidden, num_class)), dtype=floatX)
 		param_idx += 2*num_hidden*num_class
 		# Bias vector for softmax function
 		self.b_softmax = self.theta[param_idx: param_idx+num_class]

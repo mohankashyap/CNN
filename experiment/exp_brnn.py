@@ -23,6 +23,7 @@ from wordvec import WordEmbedding
 from logistic import SoftmaxLayer
 
 theano.config.openmp=True
+theano.config.exception_verbosity='high'
 
 class TestBRNN(unittest.TestCase):
 	'''
@@ -219,7 +220,7 @@ class TestBRNN(unittest.TestCase):
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		history_grads = np.zeros(brnn.num_params)
-		n_epoch = 2000
+		n_epoch = 1000
 		learn_rate = 1
 		fudge_factor = 1e-6
 		for i in xrange(n_epoch):
@@ -227,19 +228,22 @@ class TestBRNN(unittest.TestCase):
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params)
-			pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
+			tmp_history_grads = np.zeros(brnn.num_params)
+			pprint('Total number of parameters in BRNN: %d' % brnn.num_params)
 			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
 				tot_grads += current_grads
 				tot_error += cost
 				# historical gradient accumulation
-				history_grads += current_grads ** 2
+				tmp_history_grads += current_grads ** 2
 				# predict current training label
 				prediction = brnn.predict(train_seq)[0]
 				tot_count += prediction == train_label
 				conf_matrix[train_label, prediction] += 1
 			# Batch updating 
 			tot_grads /= self.train_size
+			tmp_history_grads /= self.train_size
+			history_grads += tmp_history_grads
 			# Update historical gradient vector
 			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
 			brnn.update_params(adjusted_grads, learn_rate)
