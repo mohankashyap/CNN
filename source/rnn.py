@@ -62,7 +62,7 @@ class RNN(object):
 			return h_t
 		# h is the hidden representation over a time sequence
 		self.hs, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h0],
-								truncated_gradient=configs.bptt)
+								truncate_gradient=configs.bptt)
 		self.h = self.hs[-1]
 		# L1, L2 regularization
 		self.L1_norm = T.sum(T.abs_(self.W) + T.abs_(self.U))
@@ -163,9 +163,9 @@ class TBRNN(object):
 			return h_t
 		# Forward and backward representation over time
 		self.forward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_start], 
-										truncated_gradient=configs.bptt)
+										truncate_gradient=configs.bptt)
 		self.backward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_end], 
-										 truncated_gradient=configs.bptt, go_backwards=True)
+										 truncate_gradient=configs.bptt, go_backwards=True)
 		# Store the final value
 		self.h_start_star = self.forward_h[-1]
 		self.h_end_star = self.backward_h[-1]
@@ -332,9 +332,9 @@ class BRNN(object):
 			return h_t
 		# Forward and backward representation over time
 		self.forward_h, _ = theano.scan(fn=forward_step, sequences=self.input, outputs_info=[self.h_start],
-										truncated_gradient=configs.bptt)
+										truncate_gradient=configs.bptt)
 		self.backward_h, _ = theano.scan(fn=backward_step, sequences=self.input, outputs_info=[self.h_end], 
-										 truncated_gradient=configs.bptt, go_backwards=True)
+										 truncate_gradient=configs.bptt, go_backwards=True)
 		# Store the final value
 		self.h_start_star = self.forward_h[-1]
 		self.h_end_star = self.backward_h[-1]
