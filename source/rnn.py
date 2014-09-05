@@ -186,10 +186,14 @@ class TBRNN(object):
 			self.cost += configs.lambda1 * self.L2_norm
 		# Compute gradient
 		self.gradtheta = T.grad(self.cost, self.theta)
+		self.gradinput = T.grad(self.cost, self.input)
 		# Build objective function
-		# Compute the gradients
+		# Compute the gradients to parameters
 		self.compute_cost_and_gradient = theano.function(inputs=[self.input, self.truth], 
 												outputs=[self.cost, self.gradtheta])
+		# Compute the gradients to inputs
+		self.compute_input_gradient = theano.function(inputs=[self.input, self.truth],
+												outputs=self.gradinput)
 		# Build prediction function
 		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 		if verbose:
