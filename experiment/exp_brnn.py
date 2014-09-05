@@ -379,7 +379,7 @@ class TestBRNN(unittest.TestCase):
 			pprint('Confusion matrix: ')
 			pprint(conf_matrix)
 			pprint('-' * 50)
-			if (i+1) % 1 == 0:
+			if (i+1) % 100 == 0:
 				pprint('=' * 50)
 				pprint('Test at epoch: %d' % i)
 				# Testing
