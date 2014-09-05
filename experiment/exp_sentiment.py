@@ -42,7 +42,8 @@ class TestSentiment(unittest.TestCase):
 		in sentiment analysis task, preprocessing.
 		'''
 		np.random.seed(1991)
-		senti_train_filename = '../data/sentiment-train.txt'
+		# senti_train_filename = '../data/sentiment-train.txt'
+		senti_train_filename = '../data/sentiment-train-phrases.txt'
 		senti_test_filename = '../data/sentiment-test.txt'
 		senti_train_txt, senti_train_label = [], []
 		senti_test_txt, senti_test_label = [], []
@@ -148,7 +149,7 @@ class TestSentiment(unittest.TestCase):
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
-	@unittest.skip('Without sparsity constraint: accuracy = 0.819330')
+	# @unittest.skip('Without sparsity constraint: accuracy = 0.819330')
 	def testSoftmaxWithFineTuning(self):
 		'''
 		Sentiment analysis task with softmax classifier and fine tuning
@@ -215,6 +216,7 @@ class TestSentiment(unittest.TestCase):
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
+	@unittest.skip('Wait a minute')
 	def testSoftmaxWithRaw(self):
 		'''
 		sentiment analysis task with softmax on raw input

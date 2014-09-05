@@ -103,23 +103,23 @@ class TestRNNSP(unittest.TestCase):
 		pprint('Max sentence length in training set: %d' % max(sp_train_len))
 		pprint('Max sentence length in test set: %d' % max(sp_test_len))
 
-	def testBRNN(self):
+	def testTBRNN(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
 
 		config_filename = './sp_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		brnn = BRNN(configer, verbose=True)
+		brnn = TBRNN(configer, verbose=True)
 		end_time = time.time()
-		pprint('Time used to build BRNN: %f seconds.' % (end_time-start_time))
+		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
 		# Training
 		pprint('positive labels: %d' % np.sum(self.sp_train_label))
 		pprint('negative labels: %d' % (self.sp_train_label.shape[0]-np.sum(self.sp_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		history_grads = np.zeros(brnn.num_params)
-		n_epoch = 1000
+		n_epoch = 2000
 		learn_rate = 1
 		fudge_factor = 1e-6
 		for i in xrange(n_epoch):
@@ -127,7 +127,7 @@ class TestRNNSP(unittest.TestCase):
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params)
-			pprint('Total number of parameters in BRNN: %d' % brnn.num_params)
+			pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
 			for train_seq, train_label in zip(self.sp_train_set, self.sp_train_label):
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
 				tot_grads += current_grads
@@ -191,12 +191,12 @@ class TestRNNSP(unittest.TestCase):
 			test_backward_rep[i, :] = brnn.show_backward(test_seq)
 		end_time = time.time()
 		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-		sio.savemat('./sp-BRNN-rep.mat', {'training_forward' : training_forward_rep, 
+		sio.savemat('./sp-TBRNN-rep.mat', {'training_forward' : training_forward_rep, 
 									   'training_backward' : training_backward_rep, 
 									   'test_forward' : test_forward_rep, 
 									   'test_backward' : test_backward_rep})
 		# Save TBRNN
-		TBRNN.save('sp.nbrnn.pkl', brnn)
+		TBRNN.save('sp.tbrnn.pkl', brnn)
 		pprint('Model successfully saved...')
 
 
