@@ -425,7 +425,7 @@ class TestBRNN(unittest.TestCase):
 									   'test_forward' : test_forward_rep, 
 									   'test_backward' : test_backward_rep})
 		# Save TBRNN
-		TBRNN.save('sentiment.brnn.Sep5_1.pkl', brnn)
+		TBRNN.save('sentiment.brnn.finetune.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
 
 
