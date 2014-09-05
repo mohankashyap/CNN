@@ -383,7 +383,7 @@ class TestBRNN(unittest.TestCase):
 				pprint('Test at epoch: %d' % i)
 				# Testing
 				tot_count = 0
-				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+				for test_indices, test_label in zip(self.senti_test_words_label, self.senti_test_label):
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
 				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
@@ -394,7 +394,9 @@ class TestBRNN(unittest.TestCase):
 		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
 		tot_count = 0
-		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+		for test_indices, test_label in zip(self.senti_test_set, self.senti_test_label):
+			# Dynamically build test instances
+			test_seq = self.word_embedding._embedding[test_indices, :]
 			prediction = brnn.predict(test_seq)[0]
 			tot_count += test_label == prediction
 		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
@@ -406,24 +408,8 @@ class TestBRNN(unittest.TestCase):
 			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
 		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
-		# Show representation for training inputs and testing inputs
-		start_time = time.time()
-		training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
-		test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
-		training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
-		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
-		for i, train_seq in enumerate(self.senti_train_set):
-			training_forward_rep[i, :] = brnn.show_forward(train_seq)
-			training_backward_rep[i, :] = brnn.show_backward(train_seq)
-		for i, test_seq in enumerate(self.senti_test_set):
-			test_forward_rep[i, :] = brnn.show_forward(test_seq)
-			test_backward_rep[i, :] = brnn.show_backward(test_seq)
-		end_time = time.time()
-		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-		sio.savemat('./BRNN-rep.mat', {'training_forward' : training_forward_rep, 
-									   'training_backward' : training_backward_rep, 
-									   'test_forward' : test_forward_rep, 
-									   'test_backward' : test_backward_rep})
+		# Save new word-embedding on sentiment analysis task
+		WordEmbedding.save('word-embedding-sentiment.pkl', )
 		# Save TBRNN
 		TBRNN.save('sentiment.brnn.finetune.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
