@@ -61,7 +61,8 @@ class RNN(object):
 									T.dot(h_tm1, self.U) + self.b)
 			return h_t
 		# h is the hidden representation over a time sequence
-		self.hs, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h0])
+		self.hs, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h0],
+								truncated_gradient=configs.bptt)
 		self.h = self.hs[-1]
 		# L1, L2 regularization
 		self.L1_norm = T.sum(T.abs_(self.W) + T.abs_(self.U))
@@ -161,8 +162,10 @@ class TBRNN(object):
 									T.dot(h_tm1, self.U) + self.b)
 			return h_t
 		# Forward and backward representation over time
-		self.forward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_start])
-		self.backward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_end], go_backwards=True)
+		self.forward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_start], 
+										truncated_gradient=configs.bptt)
+		self.backward_h, _ = theano.scan(fn=step, sequences=self.input, outputs_info=[self.h_end], 
+										 truncated_gradient=configs.bptt, go_backwards=True)
 		# Store the final value
 		self.h_start_star = self.forward_h[-1]
 		self.h_end_star = self.backward_h[-1]
@@ -205,6 +208,7 @@ class TBRNN(object):
 			pprint('Is regularization applied? %s' % ('yes' if configs.regularization else 'no'))
 			if configs.regularization:
 				pprint('Coefficient of regularization term: %f' % configs.lambda1)
+			pprint('BPTT step: %d' % configs.bptt)
 			pprint('Number of free parameters in TBRNN: %d' % self.num_params)
 			pprint('*' * 50)
 
@@ -327,8 +331,10 @@ class BRNN(object):
 									T.dot(h_tm1, self.U_backward) + self.b_backward)
 			return h_t
 		# Forward and backward representation over time
-		self.forward_h, _ = theano.scan(fn=forward_step, sequences=self.input, outputs_info=[self.h_start])
-		self.backward_h, _ = theano.scan(fn=backward_step, sequences=self.input, outputs_info=[self.h_end], go_backwards=True)
+		self.forward_h, _ = theano.scan(fn=forward_step, sequences=self.input, outputs_info=[self.h_start],
+										truncated_gradient=configs.bptt)
+		self.backward_h, _ = theano.scan(fn=backward_step, sequences=self.input, outputs_info=[self.h_end], 
+										 truncated_gradient=configs.bptt, go_backwards=True)
 		# Store the final value
 		self.h_start_star = self.forward_h[-1]
 		self.h_end_star = self.backward_h[-1]
@@ -375,6 +381,7 @@ class BRNN(object):
 			pprint('Is regularization applied? %s' % ('yes' if configs.regularization else 'no'))
 			if configs.regularization:
 				pprint('Coefficient of regularization term: %f' % configs.lambda1)
+			pprint('BPTT step: %d' % configs.bptt)
 			pprint('Number of free parameters in BRNN: %d' % self.num_params)
 			pprint('*' * 50)
 
