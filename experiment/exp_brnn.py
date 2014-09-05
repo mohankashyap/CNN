@@ -102,7 +102,7 @@ class TestBRNN(unittest.TestCase):
 		self.test_size = test_size
 		self.word_embedding = word_embedding
 
-	@unittest.skip('Wait a minute')
+	# @unittest.skip('Wait a minute')
 	def testTBRNNonSentiment(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
@@ -111,9 +111,9 @@ class TestBRNN(unittest.TestCase):
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
 		# brnn = TBRNN(configer, verbose=True)
-		brnn = TBRNN.load('sentiment.brnn.adagrad.pkl')
+		brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
 		end_time = time.time()
-		pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
+		pprint('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
@@ -198,10 +198,10 @@ class TestBRNN(unittest.TestCase):
 									   'test_forward' : test_forward_rep, 
 									   'test_backward' : test_backward_rep})
 		# Save TBRNN
-		TBRNN.save('sentiment.brnn.pkl', brnn)
+		TBRNN.save('sentiment.brnn.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
 
-	# @unittest.skip('Wait a minute')
+	@unittest.skip('Wait a minute')
 	def testBRNNonSentiment(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
@@ -297,6 +297,104 @@ class TestBRNN(unittest.TestCase):
 		# Save TBRNN
 		TBRNN.save('sentiment.nbrnn.pkl', brnn)
 		pprint('Model successfully saved...')
+
+	@unittest.skip('Wait a minute')
+	def testBRNNwithFineTuning(self):
+		# Set print precision
+		np.set_printoptions(threshold=np.nan)
+
+		config_filename = './sentiment_brnn.conf'
+		start_time = time.time()
+		configer = RNNConfiger(config_filename)
+		brnn = BRNN(configer, verbose=True)
+		end_time = time.time()
+		pprint('Time used to build BRNN: %f seconds.' % (end_time-start_time))
+		# Training
+		pprint('positive labels: %d' % np.sum(self.senti_train_label))
+		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
+		start_time = time.time()
+		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
+		history_grads = np.zeros(brnn.num_params)
+		n_epoch = 1000
+		learn_rate = 1
+		fudge_factor = 1e-6
+		for i in xrange(n_epoch):
+			tot_count = 0
+			tot_error = 0.0
+			conf_matrix = np.zeros((2, 2), dtype=np.int32)
+			tot_grads = np.zeros(brnn.num_params)
+			pprint('Total number of parameters in BRNN: %d' % brnn.num_params)
+			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
+				tot_grads += current_grads
+				tot_error += cost
+				# historical gradient accumulation
+				history_grads += current_grads ** 2
+				# predict current training label
+				prediction = brnn.predict(train_seq)[0]
+				tot_count += prediction == train_label
+				conf_matrix[train_label, prediction] += 1
+			# Batch updating 
+			tot_grads /= self.train_size
+			# Update historical gradient vector
+			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
+			brnn.update_params(adjusted_grads, learn_rate)
+			# End of the core AdaGrad updating algorithm
+			accuracy = tot_count / float(self.train_size)
+			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
+			pprint('Confusion matrix: ')
+			pprint(conf_matrix)
+			pprint('-' * 50)
+			if (i+1) % 100 == 0:
+				pprint('=' * 50)
+				pprint('Test at epoch: %d' % i)
+				# Testing
+				tot_count = 0
+				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+					prediction = brnn.predict(test_seq)[0]
+					tot_count += test_label == prediction
+				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
+				pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+				pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+				pprint('=' * 50)
+		end_time = time.time()
+		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
+		# Testing
+		tot_count = 0
+		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
+			prediction = brnn.predict(test_seq)[0]
+			tot_count += test_label == prediction
+		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
+		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		# Re-testing on training set
+		tot_count = 0
+		for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+			prediction = brnn.predict(train_seq)[0]
+			tot_count += train_label == prediction
+		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
+		# Show representation for training inputs and testing inputs
+		start_time = time.time()
+		training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
+		test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
+		training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
+		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
+		for i, train_seq in enumerate(self.senti_train_set):
+			training_forward_rep[i, :] = brnn.show_forward(train_seq)
+			training_backward_rep[i, :] = brnn.show_backward(train_seq)
+		for i, test_seq in enumerate(self.senti_test_set):
+			test_forward_rep[i, :] = brnn.show_forward(test_seq)
+			test_backward_rep[i, :] = brnn.show_backward(test_seq)
+		end_time = time.time()
+		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
+		sio.savemat('./nBRNN-rep.mat', {'training_forward' : training_forward_rep, 
+									   'training_backward' : training_backward_rep, 
+									   'test_forward' : test_forward_rep, 
+									   'test_backward' : test_backward_rep})
+		# Save TBRNN
+		TBRNN.save('sentiment.nbrnn.pkl', brnn)
+		pprint('Model successfully saved...')
+
 
 
 if __name__ == '__main__':
