@@ -58,7 +58,7 @@ class TestBRNN(unittest.TestCase):
 				senti_train_label.append(int(label))
 				words = txt.split()
 				words = [word.lower() for word in words]
-				tmp_indices = np.zeros(len(words), dtype=np.int32)
+				tmp_indices = np.zeros(len(words)+2, dtype=np.int32)
 				tmp_indices[0] = self.blank_index
 				tmp_indices[1:-1] = np.asarray([word_embedding.word2index(word) for word in words])
 				tmp_indices[-1] = self.blank_index
@@ -71,7 +71,7 @@ class TestBRNN(unittest.TestCase):
 				senti_test_label.append(int(label))
 				words = txt.split()
 				words = [word.lower() for word in words]
-				tmp_indices = np.zeros(len(words), dtype=np.int32)
+				tmp_indices = np.zeros(len(words)+2, dtype=np.int32)
 				tmp_indices[0] = self.blank_index
 				tmp_indices[1:-1] = np.asarray([word_embedding.word2index(word) for word in words])
 				tmp_indices[-1] = self.blank_index
@@ -320,7 +320,7 @@ class TestBRNN(unittest.TestCase):
 		TBRNN.save('sentiment.nbrnn.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
 
-	@unittest.skip('Wait a minute')
+	# @unittest.skip('Wait a minute')
 	def testTBRNNwithFineTuning(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
