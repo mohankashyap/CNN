@@ -149,7 +149,8 @@ class TestSentiment(unittest.TestCase):
 		accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
 		pprint('Test accuracy: %f' % accuracy)
 
-	# @unittest.skip('Without sparsity constraint: accuracy = 0.819330')
+	@unittest.skip('Without sparsity constraint: accuracy = 0.819330 \
+					Without sparsity constraint on large data: accuracy = 0.817133')
 	def testSoftmaxWithFineTuning(self):
 		'''
 		Sentiment analysis task with softmax classifier and fine tuning
@@ -374,7 +375,7 @@ class TestSentiment(unittest.TestCase):
 		test_accuracy = right_count / float(self.test_size)
 		pprint('Test set accuracy: %f' % test_accuracy)
 
-	@unittest.skip('accuracy @ sigmoid: 0.798745')
+	# @unittest.skip('accuracy @ sigmoid: 0.798745')
 	def testCNNwithFineTuning(self):
 		'''
 		Test the performance of CNN with fine-tuning the word-embedding.
