@@ -36,7 +36,7 @@ class TestBRNN(unittest.TestCase):
 		in sentiment analysis task, preprocessing.
 		'''
 		np.random.seed(42)
-		senti_train_filename = '../data/sentiment-train.txt'
+		senti_train_filename = '../data/sentiment-train-phrases.txt'
 		senti_test_filename = '../data/sentiment-test.txt'
 		senti_train_txt, senti_train_label = [], []
 		senti_test_txt, senti_test_label = [], []
@@ -123,7 +123,7 @@ class TestBRNN(unittest.TestCase):
 		self.test_size = test_size
 		self.word_embedding = word_embedding
 
-	@unittest.skip('Wait a minute')
+	# @unittest.skip('Wait a minute')
 	def testTBRNNonSentiment(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
@@ -131,8 +131,8 @@ class TestBRNN(unittest.TestCase):
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		# brnn = TBRNN(configer, verbose=True)
-		brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
+		brnn = TBRNN(configer, verbose=True)
+		# brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
 		end_time = time.time()
 		pprint('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
 		# Training
@@ -206,20 +206,8 @@ class TestBRNN(unittest.TestCase):
 		test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
 		training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
 		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
-		for i, train_seq in enumerate(self.senti_train_set):
-			training_forward_rep[i, :] = brnn.show_forward(train_seq)
-			training_backward_rep[i, :] = brnn.show_backward(train_seq)
-		for i, test_seq in enumerate(self.senti_test_set):
-			test_forward_rep[i, :] = brnn.show_forward(test_seq)
-			test_backward_rep[i, :] = brnn.show_backward(test_seq)
-		end_time = time.time()
-		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-		sio.savemat('./BRNN-rep.mat', {'training_forward' : training_forward_rep, 
-									   'training_backward' : training_backward_rep, 
-									   'test_forward' : test_forward_rep, 
-									   'test_backward' : test_backward_rep})
 		# Save TBRNN
-		TBRNN.save('sentiment.brnn.Sep5_1.pkl', brnn)
+		TBRNN.save('sentiment.brnn.Sep5_2.pkl', brnn)
 		pprint('Model successfully saved...')
 
 	@unittest.skip('Wait a minute')
@@ -320,7 +308,7 @@ class TestBRNN(unittest.TestCase):
 		TBRNN.save('sentiment.nbrnn.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
 
-	# @unittest.skip('Wait a minute')
+	@unittest.skip('Wait a minute')
 	def testTBRNNwithFineTuning(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
