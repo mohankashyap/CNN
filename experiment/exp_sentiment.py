@@ -202,6 +202,20 @@ class TestSentiment(unittest.TestCase):
 			# Fine-tuning the word-embedding matrix
 			train_batch_grad = compute_grad_to_input(train_batch, self.senti_train_label)
 			self.word_embedding._embedding -= rate * train_batch_sparse.dot(train_batch_grad)
+			if (i+1) % 100 == 0:
+				# Test
+				pprint('-' * 50)
+				test_batch = np.zeros((self.test_size, self.word_embedding.embedding_dim()), dtype=floatX)
+				for i, sent in enumerate(self.senti_test_txt):
+					words = sent.split()
+					words = [word.lower() for word in words]
+					vectors = np.asarray([self.word_embedding.wordvec(word) for word in words])
+					test_batch[i, :] = np.mean(vectors, axis=0)
+				# Evaluation on test set
+				prediction = softmax.predict(test_batch)
+				accuracy = np.sum(prediction == self.senti_test_label) / float(self.test_size)
+				pprint('Test accuracy: %f' % accuracy)
+				pprint('-' * 50)
 		end_time = time.time()
 		pprint('Time used to train the softmax classifier with fine-tuning: %f minutes' % ((end_time-start_time)/60))
 		# Test
