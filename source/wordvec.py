@@ -68,3 +68,13 @@ class WordEmbedding(object):
 		'''
 		idx = self.word2index(word)
 		return self._embedding[idx]
+
+	@staticmethod
+	def load(fname):
+		with file(fname, 'rb') as fin:
+			return cPickle.load(fname)
+
+	@staticmethod
+	def save(fname, model):
+		with file(fname, 'wb') as fout:
+			cPickle.dump(model, fout)

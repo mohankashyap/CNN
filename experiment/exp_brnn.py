@@ -41,26 +41,47 @@ class TestBRNN(unittest.TestCase):
 		senti_train_txt, senti_train_label = [], []
 		senti_test_txt, senti_test_label = [], []
 		start_time = time.time()
+		# Record id of words for fine-tuning
+		senti_train_words_label, senti_test_words_label = [], []
+		# Load Word-Embedding
+		embedding_filename = '../data/wiki_embeddings.txt'
+		# Load training/test data sets and wiki-embeddings
+		word_embedding = WordEmbedding(embedding_filename)
+		# Starting and Ending token for each sentence
+		self.blank_token = word_embedding.wordvec('</s>')
+		self.blank_index = word_embedding.word2index('</s>')
 		# Read training data set
 		with file(senti_train_filename, 'r') as fin:
 			reader = csv.reader(fin, delimiter='|')
 			for txt, label in reader:
 				senti_train_txt.append(txt)
 				senti_train_label.append(int(label))
+				words = txt.split()
+				words = [word.lower() for word in words]
+				tmp_indices = np.zeros(len(words), dtype=np.int32)
+				tmp_indices[0] = self.blank_index
+				tmp_indices[1:-1] = np.asarray([word_embedding.word2index(word) for word in words])
+				tmp_indices[-1] = self.blank_index
+				senti_train_words_label.append(tmp_indices)
 		# Read test data set
 		with file(senti_test_filename, 'r') as fin:
 			reader = csv.reader(fin, delimiter='|')
 			for txt, label in reader:
 				senti_test_txt.append(txt)
 				senti_test_label.append(int(label))
+				words = txt.split()
+				words = [word.lower() for word in words]
+				tmp_indices = np.zeros(len(words), dtype=np.int32)
+				tmp_indices[0] = self.blank_index
+				tmp_indices[1:-1] = np.asarray([word_embedding.word2index(word) for word in words])
+				tmp_indices[-1] = self.blank_index
+				senti_test_words_label.append(tmp_indices)
 		end_time = time.time()
 		pprint('Time used to load training and test data set: %f seconds.' % (end_time-start_time))
-		embedding_filename = '../data/wiki_embeddings.txt'
-		# Load training/test data sets and wiki-embeddings
-		word_embedding = WordEmbedding(embedding_filename)
 		start_time = time.time()
-		# Starting and Ending token for each sentence
-		self.blank_token = word_embedding.wordvec('</s>')
+		# Store original word index representation
+		self.senti_train_words_label = senti_train_words_label
+		self.senti_test_words_label = senti_test_words_label
 		# Store original text representation
 		self.senti_train_txt = senti_train_txt
 		self.senti_test_txt = senti_test_txt
@@ -201,7 +222,7 @@ class TestBRNN(unittest.TestCase):
 		TBRNN.save('sentiment.brnn.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
 
-	# @unittest.skip('Wait a minute')
+	@unittest.skip('Wait a minute')
 	def testBRNNonSentiment(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
@@ -300,33 +321,41 @@ class TestBRNN(unittest.TestCase):
 		pprint('Model successfully saved...')
 
 	@unittest.skip('Wait a minute')
-	def testBRNNwithFineTuning(self):
+	def testTBRNNwithFineTuning(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
 
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		brnn = BRNN(configer, verbose=True)
+		# brnn = TBRNN(configer, verbose=True)
+		brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
 		end_time = time.time()
-		pprint('Time used to build BRNN: %f seconds.' % (end_time-start_time))
+		pprint('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
+		pprint('Start training TBRNN with fine-tuning...')
 		# Training
 		pprint('positive labels: %d' % np.sum(self.senti_train_label))
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		history_grads = np.zeros(brnn.num_params)
-		n_epoch = 1000
+		n_epoch = 2000
 		learn_rate = 1
+		embed_learn_rate = 1e-2
 		fudge_factor = 1e-6
 		for i in xrange(n_epoch):
 			tot_count = 0
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params)
-			pprint('Total number of parameters in BRNN: %d' % brnn.num_params)
-			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+			pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
+			for train_indices, train_label in zip(self.senti_train_words_label, self.senti_train_label):
+				# Dynamically build training instances
+				train_seq = self.word_embedding._embedding[train_indices, :]
+				# Compute cost and gradients with respect to parameters and word-embeddings
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
+				input_grads = brnn.compute_input_gradient(train_seq, [train_label])
+				# Accumulating errors and gradients
 				tot_grads += current_grads
 				tot_error += cost
 				# historical gradient accumulation
@@ -335,6 +364,9 @@ class TestBRNN(unittest.TestCase):
 				prediction = brnn.predict(train_seq)[0]
 				tot_count += prediction == train_label
 				conf_matrix[train_label, prediction] += 1
+				# Update word-embedding
+				for j in train_indices:
+					self.word_embedding._embedding[j, :] -= embed_learn_rate * input_grads[j, :]
 			# Batch updating 
 			tot_grads /= self.train_size
 			# Update historical gradient vector
@@ -388,12 +420,12 @@ class TestBRNN(unittest.TestCase):
 			test_backward_rep[i, :] = brnn.show_backward(test_seq)
 		end_time = time.time()
 		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-		sio.savemat('./nBRNN-rep.mat', {'training_forward' : training_forward_rep, 
+		sio.savemat('./BRNN-rep.mat', {'training_forward' : training_forward_rep, 
 									   'training_backward' : training_backward_rep, 
 									   'test_forward' : test_forward_rep, 
 									   'test_backward' : test_backward_rep})
 		# Save TBRNN
-		TBRNN.save('sentiment.nbrnn.pkl', brnn)
+		TBRNN.save('sentiment.brnn.Sep5_1.pkl', brnn)
 		pprint('Model successfully saved...')
 
 
