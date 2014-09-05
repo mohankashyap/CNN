@@ -328,8 +328,8 @@ class TestBRNN(unittest.TestCase):
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		# brnn = TBRNN(configer, verbose=True)
-		brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
+		brnn = TBRNN(configer, verbose=True)
+		# brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
 		end_time = time.time()
 		pprint('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
 		pprint('Start training TBRNN with fine-tuning...')
@@ -338,10 +338,10 @@ class TestBRNN(unittest.TestCase):
 		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
-		history_grads = np.zeros(brnn.num_params)
+		# history_grads = np.zeros(brnn.num_params)
 		n_epoch = 2000
-		learn_rate = 1
-		embed_learn_rate = 1e-2
+		learn_rate = 1e-2
+		embed_learn_rate = 1e-3
 		fudge_factor = 1e-6
 		for i in xrange(n_epoch):
 			tot_count = 0
@@ -359,31 +359,34 @@ class TestBRNN(unittest.TestCase):
 				tot_grads += current_grads
 				tot_error += cost
 				# historical gradient accumulation
-				history_grads += current_grads ** 2
+				# history_grads += current_grads ** 2
 				# predict current training label
 				prediction = brnn.predict(train_seq)[0]
 				tot_count += prediction == train_label
 				conf_matrix[train_label, prediction] += 1
 				# Update word-embedding
-				for j in train_indices:
-					self.word_embedding._embedding[j, :] -= embed_learn_rate * input_grads[j, :]
+				for k, j in enumerate(train_indices):
+					self.word_embedding._embedding[j, :] -= embed_learn_rate * input_grads[k, :]
 			# Batch updating 
 			tot_grads /= self.train_size
 			# Update historical gradient vector
-			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
-			brnn.update_params(adjusted_grads, learn_rate)
+			# adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
+			# brnn.update_params(adjusted_grads, learn_rate)
+			brnn.update_params(tot_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
 			accuracy = tot_count / float(self.train_size)
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			pprint('Confusion matrix: ')
 			pprint(conf_matrix)
 			pprint('-' * 50)
-			if (i+1) % 100 == 0:
+			if (i+1) % 1 == 0:
 				pprint('=' * 50)
 				pprint('Test at epoch: %d' % i)
 				# Testing
 				tot_count = 0
 				for test_indices, test_label in zip(self.senti_test_words_label, self.senti_test_label):
+					# Dynamically build test instances
+					test_seq = self.word_embedding._embedding[test_indices, :]
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
 				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
