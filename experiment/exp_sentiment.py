@@ -375,7 +375,7 @@ class TestSentiment(unittest.TestCase):
 		test_accuracy = right_count / float(self.test_size)
 		pprint('Test set accuracy: %f' % test_accuracy)
 
-	# @unittest.skip('accuracy @ sigmoid: 0.798745')
+	@unittest.skip('accuracy @ sigmoid: 0.799561')
 	def testCNNwithFineTuning(self):
 		'''
 		Test the performance of CNN with fine-tuning the word-embedding.
@@ -439,8 +439,6 @@ class TestSentiment(unittest.TestCase):
 			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_cost, accuracy))
 			if (i+1)%100 == 0:
 				ConvNet.save('./sentiment.cnn', convnet)
-				# with gzip.GzipFile('./fine-tune.sentiment.word2vec.gz', 'wb') as fout:
-				# 	cPickle.dump(self.word_embedding, fout)
 		end_time = time.time()
 		pprint('Time used to train CNN on Sentiment analysis task: %f minutes.' % ((end_time-start_time)/60))
 		# Test
