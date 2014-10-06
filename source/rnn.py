@@ -406,3 +406,29 @@ class BRNN(object):
 		with file(fname, 'rb') as fin:
 			return cPickle.load(fin)
 
+
+class BRNNSentence(BRNN):
+	'''
+	Bidirectional BRNN with gated (weighting) intermediate representation.
+	'''
+	def __init__(self, configs, verbose=True):
+		# Call parent's class method to build the basic architecture of BRNN
+		super(BRNN, self).__init__(configs, verbose)
+		if verbose:
+			pprint('*' * 50)
+			pprint('Finished constructing Bidirectional Recurrent Neural Network (BRNN) for Sentence model.')
+						
+
+
+
+
+
+
+
+
+
+
+
+
+
+
