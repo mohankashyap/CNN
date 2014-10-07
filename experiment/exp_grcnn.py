@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# @Date    : 2014-10-07 15:49:24
+# @Author  : Han Zhao (han.zhao@uwaterloo.ca)
+# @Link    : https://github.com/KeiraZhao
+# @Version : $Id$
+
+import os, sys
+import cPickle
+import unittest
+import time
+import logging
+import csv
+import theano
+import theano.tensor as T
+import numpy as np
+# Set the basic configuration of the logging system
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M')
+sys.path.append('../source/')
+logger = logging.getLogger(__name__)
+
+from utils import floatX
+from grcnn import GrCNN
+from wordvec import WordEmbedding
+from config import GrCNNConfiger
+
+# theano.config.mode='DebugMode'
+theano.config.omp=True
+
+class TestGrCNN(unittest.TestCase):
+    def setUp(self):
+        '''
+        Load training and test texts and labels in sentiment analysis task, preprocessing.
+        '''
+        np.random.seed(1991)
+        senti_train_filename = '../data/sentiment-train-phrases.txt'
+        senti_test_filename = '../data/sentiment-test.txt'
+        senti_train_txt, senti_train_label = [], []
+        senti_test_txt, senti_test_label = [], []
+        start_time = time.time()
+        # Read training data set
+        with file(senti_train_filename, 'r') as fin:
+            reader = csv.reader(fin, delimiter='|')
+            for txt, label in reader:
+                senti_train_txt.append(txt)
+                senti_train_label.append(int(label))
+        # Read test data set
+        with file(senti_test_filename, 'r') as fin:
+            reader = csv.reader(fin, delimiter='|')
+            for txt, label in reader:
+                senti_test_txt.append(txt)
+                senti_test_label.append(int(label))
+        end_time = time.time()
+        logger.debug('Time used to load training and test data set: %f seconds.' % (end_time-start_time))
+        embedding_filename = '../data/wiki_embeddings.txt'
+        # Load wiki-embeddings
+        word_embedding = WordEmbedding(embedding_filename)
+        self.token = word_embedding.wordvec('</s>')
+        # Store the original text representation
+        self.senti_train_txt = senti_train_txt
+        self.senti_test_txt = senti_test_txt
+        # Word-vector representation
+        self.senti_train_label = np.asarray(senti_train_label, dtype=np.int32)
+        self.senti_test_label = np.asarray(senti_test_label, dtype=np.int32)
+        self.train_size = len(senti_train_txt)
+        self.test_size = len(senti_test_txt)
+        logger.debug('Training set size: %d' % self.train_size)
+        logger.debug('Test set size: %d' % self.test_size)
+        assert self.train_size == self.senti_train_label.shape[0]
+        assert self.test_size == self.senti_test_label.shape[0]
+        # Build the word-embedding matrix
+        start_time = time.time()
+        self.senti_train_set, self.senti_test_set = [], []
+        for sent in senti_train_txt:
+            words = sent.split()
+            words = [word.lower() for word in words]
+            vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()), dtype=floatX)
+            vectors[0, :] = self.token
+            tmp = np.asarray([word_embedding.wordvec(word) for word in words])
+            vectors[1:-1, :] = tmp
+            vectors[-1, :] = self.token
+            self.senti_train_set.append(vectors)
+        for sent in senti_test_txt:
+            words = sent.split()
+            words = [word.lower() for word in words]
+            vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()), dtype=floatX)
+            vectors[0, :] = self.token
+            tmp = np.asarray([word_embedding.wordvec(word) for word in words])
+            vectors[1:-1, :] = tmp
+            vectors[-1, :] = self.token
+            self.senti_test_set.append(vectors)
+        end_time = time.time()
+        logger.debug('Time used to build training and test word embedding matrix: %f seconds.' % (end_time-start_time))
+        self.word_embedding = word_embedding
+
+    def testGrCNNonSentiment(self):
+        '''
+        Test the ability of GrCNN as an encoder to do sentiment analysis task.
+        '''
+        conf_filename = './grCNN.conf'
+        start_time = time.time()
+        configer = GrCNNConfiger(conf_filename)
+        grcnn = GrCNN(config=configer, verbose=True)
+        end_time = time.time()
+        logger.debug('Time used to build GrCNN: %f seconds.' % (end_time-start_time))
+        # Training
+        start_time = time.time()
+        # Loop over epochs
+        for i in xrange(configer.nepoch):
+            # Loop over training instances
+            total_cost = 0.0
+            correct_count = 0
+            learning_rate = 1.0 / (1.0 + i/10)
+            for j in xrange(self.train_size):
+                cost, accuracy = grcnn.train(self.senti_train_set[j], 
+                            [self.senti_train_label[j]], learning_rate)
+            logger.debug('Training @ %d epoch, total cost = %f, total accuracy = %f' 
+                        % (i, total_cost, correct_count/float(self.senti_train_size)))
+        end_time = time.time()
+        logger.debug('Time used for training: %f seconds.' % (end_time-start_time))
+        start_time = time.time()
+        correct_count = 0
+        for j in xrange(self.test_size):
+            plabel = grcnn.predict(self.senti_test_set[j])
+            if plabel == self.senti_test_label[j]: correct_count += 1
+        end_time = time.time()
+        logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
+        logger.debug('Test accuracy: %f' % (correct_count / float(self.senti_test_size)))
+
+
+if __name__ == '__main__':
+    unittest.main()

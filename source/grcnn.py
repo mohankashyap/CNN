@@ -76,8 +76,8 @@ class GrCNNEncoder(object):
         nsteps = self.input.shape[0]
         # mask = T.alloc(1.0, nsteps, 1)
         self.pyramids, _ = theano.scan(fn=self._step_prop, 
-                                        outputs_info=[self.hidden0],
-                                        n_steps=nsteps-1)
+                                    outputs_info=[self.hidden0],
+                                    n_steps=nsteps-1)
         self.output = self.pyramids[-1][0].dimshuffle('x', 0)
         # Compression -- Encoding function
         self.compress = theano.function(inputs=[self.input], outputs=self.output)
@@ -158,7 +158,7 @@ class GrCNNEncoder(object):
         return next_level
 
 
-def GrCNN(object):
+class GrCNN(object):
     '''
     (Binary) Gated Recursive Convolutional Neural Network Classifier, with GRCNN as the 
     encoder part and MLP as the classifier part.
@@ -211,6 +211,27 @@ def GrCNN(object):
         '''
         cost = self.objective(instance, label, learn_rate)
         pred = self.predict(instance)
-        accuracy = np.sum(pred == label) / float(label.shape[0])
+        accuracy = np.sum(pred == label) / float(len(label))
         return cost, accuracy
+
+    @staticmethod
+    def save(fname, model):
+        '''
+        @fname: String. Filename to store the model.
+        @model: GrCNN. An instance of GrCNN classifier to be saved.
+        '''
+        with file(fname, 'wb') as fout:
+            cPickle.dump(model, fout)
+
+    @staticmethod
+    def load(fname):
+        '''
+        @fname: String. Filename to load the model.
+        '''
+        with file(fname, 'rb') as fin:
+            model = cPickle.load(fin)
+            return model
+
+
+
 

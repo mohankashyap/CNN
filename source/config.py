@@ -205,7 +205,7 @@ class GrCNNConfiger(object):
 		self._cf_parser.read(fname)
 		# Parsing
 		self.activation, self.num_input, self.num_hidden, self.num_mlp, \
-		self.random_seed = self.parse()
+		self.num_class, self.nepoch, self.random_seed = self.parse()
 
 	def get(self, cfg_object, cfg_section):
 		'''
@@ -220,5 +220,7 @@ class GrCNNConfiger(object):
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
 		num_mlp = self._cf_parser.getint('architectures', 'mlp')
 		num_class = self._cf_parser.getint('architectures', 'class')
+		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		random_seed = self._cf_parser.getint('parameters', 'random_seed')
-		return (activation, num_input, num_hidden, num_mlp, random_seed)
+		return (activation, num_input, num_hidden, num_mlp, num_class, 
+				nepoch, random_seed)
