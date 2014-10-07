@@ -21,23 +21,23 @@ logging.basicConfig(level=logging.DEBUG,
 sys.path.append('../source/')
 logger = logging.getLogger(__name__)
 
-from grcnn import GRCNNEncoder
-from config import GRCNNConfiger
+from grcnn import GrCNNEncoder
+from config import GrCNNConfiger
 
 class TestGRCNN(unittest.TestCase):
     def setUp(self):
         fname = './grCNN.conf'
-        self.configer = GRCNNConfiger(fname)
+        self.configer = GrCNNConfiger(fname)
 
     @unittest.skip('Finished building, no problem')
     def testBuilding(self):
         logger.debug('Inside testBuilding...')
-        grcnn = GRCNNEncoder(self.configer, verbose=True)
+        grcnn = GrCNNEncoder(self.configer, verbose=True)
 
     @unittest.skip('One Step propagation function passed.')
     def testOneStep(self):
         logger.debug('Inside testOneStep...')
-        grcnn = GRCNNEncoder(self.configer, verbose=True)
+        grcnn = GrCNNEncoder(self.configer, verbose=True)
         time_steps = 30000
         input_matrix = np.random.rand(time_steps, 10)
         input_matrix = input_matrix.astype(np.float32)
@@ -82,7 +82,7 @@ class TestGRCNN(unittest.TestCase):
     # @unittest.skip('Wait a minute')
     def testCompress(self):
         logger.debug('Inside testCompress...')
-        grcnn = GRCNNEncoder(self.configer, verbose=True)
+        grcnn = GrCNNEncoder(self.configer, verbose=True)
         # Build step transformation function 
         input_symbol = T.matrix()
         output_symbol = grcnn._step_prop_reduce(input_symbol)

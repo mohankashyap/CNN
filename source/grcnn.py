@@ -17,10 +17,12 @@ import config
 import utils
 from utils import floatX
 from activations import Activation
+from mlp import HiddenLayer
+from logistic import SoftmaxLayer
 
 logger = logging.getLogger(__name__)
 
-class GRCNNEncoder(object):
+class GrCNNEncoder(object):
     '''
     (Binary) Gated Recursive Convolutional Neural Network Encoder.
     '''
@@ -123,6 +125,10 @@ class GRCNNEncoder(object):
         '''
         @current_level: Input matrix at current level. The first dimension corresponds to 
         the timestamp while the second dimension corresponds to the dimension of hidden representation
+
+        Reduced version of level propagation, much more memory and time efficient implementation, but cannot
+        be used inside theano.scan because theano.scan requires that the input and output through timestamps should
+        have the same shape.
         '''
         # Build shifted matrix, due to the constraints of Theano.scan, we have to keep the shape of the
         # input and output matrix
@@ -150,3 +156,61 @@ class GRCNNEncoder(object):
                      right_gate * right_current_level + \
                      central_gate * central_current_level
         return next_level
+
+
+def GrCNN(object):
+    '''
+    (Binary) Gated Recursive Convolutional Neural Network Classifier, with GRCNN as the 
+    encoder part and MLP as the classifier part.
+    '''
+    def __init__(self, config=None, verbose=True):
+        self.encoder = GrCNNEncoder(config, verbose)
+        # Link two parts
+        self.params = self.encoder.params
+        self.input = self.encoder.input
+        self.hidden = self.encoder.output
+        # Activation function
+        self.act = Activation(config.activation)
+        # MLP Component
+        self.hidden_layer = HiddenLayer(self.hidden, (config.num_hidden, config.num_mlp), act=self.act)
+        self.compressed_hidden = self.hidden_layer.output
+        self.params += self.hidden_layer.params
+        # Softmax Component
+        self.softmax_layer = SoftmaxLayer(self.compressed_hidden, (config.num_mlp, config.num_class))
+        self.pred = self.softmax_layer.pred
+        self.params += self.softmax_layer.params
+        # Build target function 
+        self.truth = T.ivector(name='label')
+        self.learn_rate = T.scalar(name='learning rate')
+        self.cost = self.softmax_layer.NLL_loss(self.truth)
+        # Build computational graph and compute the gradient of the target 
+        # function with respect to model parameters
+        self.gradparams = T.grad(self.cost, self.params)
+        # Updates formula for stochastic gradient descent algorithm
+        self.updates = []
+        for param, gradparam in zip(self.params, self.gradparams):
+            self.updates.append((param, param-self.learn_rate*gradparam))
+        # Compile theano function
+        self.objective = theano.function(inputs=[self.input, self.truth, self.learn_rate], 
+                                        outputs=self.cost, updates=self.updates)
+        self.predict = theano.function(inputs=[self.input], outputs=self.pred)
+        if verbose:
+            logger.debug('Architecture of GrCNN built finished, summarized as below: ')
+            logger.debug('Input dimension: %d' % config.num_input)
+            logger.debug('Hidden dimension inside GrCNNEncoder pyramid: %d' % config.num_hidden)
+            logger.debug('Hidden dimension of MLP: %d' % config.num_mlp)
+            logger.debug('Number of target classes: %d' % config.num_class)
+
+    def train(self, instance, label, learn_rate):
+        '''
+        @instance: np.ndarray. Two dimension matrix which corresponds to a time sequence.
+        The first dimension along the matrix represents the time dimension while the second 
+        dimension along the matrix represents the embedding dimension.
+        @label: np.ndarray. 1 dimensional array of int as labels.
+        @learn_rate: np.scalar. Learning rate of the stochastic gradient descent algorithm.
+        '''
+        cost = self.objective(instance, label, learn_rate)
+        pred = self.predict(instance)
+        accuracy = np.sum(pred == label) / float(label.shape[0])
+        return cost, accuracy
+

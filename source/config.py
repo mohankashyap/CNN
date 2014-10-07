@@ -193,7 +193,7 @@ class RNNConfiger(object):
 		return (activation, num_input, num_hidden, num_class, \
 				regularization, lambda1, lambda2, bptt)
 
-class GRCNNConfiger(object):
+class GrCNNConfiger(object):
 	'''
 	Class for the configuration of gated recursive Convolutional Neural Network
 	'''
@@ -204,7 +204,8 @@ class GRCNNConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing
-		self.activation, self.num_input, self.num_hidden, self.random_seed = self.parse()
+		self.activation, self.num_input, self.num_hidden, self.num_mlp, \
+		self.random_seed = self.parse()
 
 	def get(self, cfg_object, cfg_section):
 		'''
@@ -217,5 +218,7 @@ class GRCNNConfiger(object):
 		activation = self._cf_parser.get('functions', 'activations')
 		num_input = self._cf_parser.getint('architectures', 'input')
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
+		num_mlp = self._cf_parser.getint('architectures', 'mlp')
+		num_class = self._cf_parser.getint('architectures', 'class')
 		random_seed = self._cf_parser.getint('parameters', 'random_seed')
-		return (activation, num_input, num_hidden, random_seed)
+		return (activation, num_input, num_hidden, num_mlp, random_seed)
