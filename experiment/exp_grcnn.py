@@ -35,7 +35,7 @@ class TestGrCNN(unittest.TestCase):
         Load training and test texts and labels in sentiment analysis task, preprocessing.
         '''
         np.random.seed(1991)
-        senti_train_filename = '../data/sentiment-train-phrases.txt'
+        senti_train_filename = '../data/sentiment-train.txt'
         senti_test_filename = '../data/sentiment-test.txt'
         senti_train_txt, senti_train_label = [], []
         senti_test_txt, senti_test_label = [], []
@@ -108,16 +108,46 @@ class TestGrCNN(unittest.TestCase):
         # Training
         start_time = time.time()
         # Loop over epochs
+        batch_size = 20
+        learning_rate = np.float32(1.0)
+        fudge_factor = 1e-6
+        logger.debug('GrCNN.params: {}'.format(grcnn.params))
+        history_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+        # Check
+        for param in history_grads:
+            logger.debug('Parameter Shape: {}'.format(param.shape))
         for i in xrange(configer.nepoch):
             # Loop over training instances
             total_cost = 0.0
-            correct_count = 0
-            learning_rate = 1.0 / (1.0 + i/10)
+            total_count = 0
+            total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             for j in xrange(self.train_size):
-                cost, accuracy = grcnn.train(self.senti_train_set[j], 
-                            [self.senti_train_label[j]], learning_rate)
-            logger.debug('Training @ %d epoch, total cost = %f, total accuracy = %f' 
-                        % (i, total_cost, correct_count/float(self.train_size)))
+                if (j+1) % batch_size == 0: 
+                    logger.debug('%6d @ %4d epoch' % (j+1, i))
+                    # Adjusted gradient for AdaGrad
+                    for grad, hist_grad in zip(total_grads, history_grads):
+                        grad /= batch_size
+                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    grcnn.update_params(total_grads, learning_rate)
+                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                cost = grcnn.objective(self.senti_train_set[j], [self.senti_train_label[j]])
+                grads = grcnn.compute_gradient(self.senti_train_set[j], [self.senti_train_label[j]])
+                # Accumulate total gradients based on batch size
+                for grad, current_grad in zip(total_grads, grads):
+                    grad += current_grad
+                total_cost += cost
+                # Accumulate historical gradients
+                for hist_grad, current_grad in zip(history_grads, grads):
+                    hist_grad += current_grad ** 2
+                # Judge whether current instance can be classified correctly or not
+                prediction = grcnn.predict(self.senti_train_set[j])[0]
+                total_count += prediction == self.senti_train_label[j]
+            logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(self.train_size)))
+            correct_count = 0
+            for j in xrange(self.test_size):
+                plabel = grcnn.predict(self.senti_test_set[j])
+                if plabel == self.senti_test_label[j]: correct_count += 1
+            logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
         end_time = time.time()
         logger.debug('Time used for training: %f seconds.' % (end_time-start_time))
         start_time = time.time()

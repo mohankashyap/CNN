@@ -179,6 +179,17 @@ class GrCNN(object):
         self.softmax_layer = SoftmaxLayer(self.compressed_hidden, (config.num_mlp, config.num_class))
         self.pred = self.softmax_layer.pred
         self.params += self.softmax_layer.params
+        # Compute the total number of parameters in this model
+        self.num_params_encoder = config.num_input * config.num_hidden + \
+                                  config.num_hidden * config.num_hidden * 2 + \
+                                  config.num_hidden + \
+                                  config.num_hidden * 3 * 2 + \
+                                  3
+        self.num_params_classifier = config.num_hidden * config.num_mlp + \
+                                     config.num_mlp + \
+                                     config.num_mlp * config.num_class + \
+                                     config.num_class
+        self.num_params = self.num_params_encoder + self.num_params_classifier
         # Build target function 
         self.truth = T.ivector(name='label')
         self.learn_rate = T.scalar(name='learning rate')
@@ -191,17 +202,21 @@ class GrCNN(object):
         for param, gradparam in zip(self.params, self.gradparams):
             self.updates.append((param, param-self.learn_rate*gradparam))
         # Compile theano function
-        self.objective = theano.function(inputs=[self.input, self.truth, self.learn_rate], 
-                                        outputs=self.cost, updates=self.updates)
+        self.objective = theano.function(inputs=[self.input, self.truth], outputs=self.cost)
         self.predict = theano.function(inputs=[self.input], outputs=self.pred)
+        # Compute the gradient of the objective function with respect to the model parameters
+        self.compute_gradient = theano.function(inputs=[self.input, self.truth], outputs=self.gradparams)
         if verbose:
             logger.debug('Architecture of GrCNN built finished, summarized as below: ')
             logger.debug('Input dimension: %d' % config.num_input)
             logger.debug('Hidden dimension inside GrCNNEncoder pyramid: %d' % config.num_hidden)
             logger.debug('Hidden dimension of MLP: %d' % config.num_mlp)
             logger.debug('Number of target classes: %d' % config.num_class)
+            logger.debug('Number of parameters in encoder part: %d' % self.num_params_encoder)
+            logger.debug('Number of parameters in classifier part: %d' % self.num_params_classifier)
+            logger.debug('Number of total parameters in this model: %d' % self.num_params)
 
-    def train(self, instance, label, learn_rate):
+    def train(self, instance, label):
         '''
         @instance: np.ndarray. Two dimension matrix which corresponds to a time sequence.
         The first dimension along the matrix represents the time dimension while the second 
@@ -209,10 +224,17 @@ class GrCNN(object):
         @label: np.ndarray. 1 dimensional array of int as labels.
         @learn_rate: np.scalar. Learning rate of the stochastic gradient descent algorithm.
         '''
-        cost = self.objective(instance, label, learn_rate)
-        pred = self.predict(instance)
-        accuracy = np.sum(pred == label) / float(len(label))
-        return cost, accuracy
+        cost = self.objective(instance, label)
+        return cost
+
+    def update_params(self, grads, learn_rate):
+        '''
+        @grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
+        @learn_rate: scalar. Learning rate.
+        '''
+        for param, grad in zip(self.params, grads):
+            p = param.get_value(borrow=True)
+            param.set_value(p - learn_rate * grad, borrow=True)
 
     @staticmethod
     def save(fname, model):
