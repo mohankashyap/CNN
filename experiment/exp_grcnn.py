@@ -117,7 +117,7 @@ class TestGrCNN(unittest.TestCase):
                 cost, accuracy = grcnn.train(self.senti_train_set[j], 
                             [self.senti_train_label[j]], learning_rate)
             logger.debug('Training @ %d epoch, total cost = %f, total accuracy = %f' 
-                        % (i, total_cost, correct_count/float(self.senti_train_size)))
+                        % (i, total_cost, correct_count/float(self.train_size)))
         end_time = time.time()
         logger.debug('Time used for training: %f seconds.' % (end_time-start_time))
         start_time = time.time()
@@ -127,7 +127,9 @@ class TestGrCNN(unittest.TestCase):
             if plabel == self.senti_test_label[j]: correct_count += 1
         end_time = time.time()
         logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
-        logger.debug('Test accuracy: %f' % (correct_count / float(self.senti_test_size)))
+        logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
+        # Save current model onto disk
+        GrCNN.save('./sentiment.grcnn', grcnn)
 
 
 if __name__ == '__main__':
