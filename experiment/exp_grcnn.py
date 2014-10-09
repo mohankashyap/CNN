@@ -110,7 +110,7 @@ class TestGrCNN(unittest.TestCase):
         # Training
         start_time = time.time()
         # Loop over epochs
-        batch_size = 500
+        batch_size = 20
         learning_rate = 1.0
         fudge_factor = 1e-6
         logger.debug('GrCNN.params: {}'.format(grcnn.params))
@@ -123,21 +123,25 @@ class TestGrCNN(unittest.TestCase):
             total_cost = 0.0
             total_count = 0
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-            learning_rate = 0.01 / (1.0 + i/10)
+            # learning_rate = 0.01 / (1.0 + i/10)
             for j in xrange(self.train_size):
-                if (j+1) % batch_size == 0: 
+                if (j+1) % batch_size == 0 or j == self.train_size-1: 
                     logger.debug('%6d @ %4d epoch' % (j+1, i))
                     # Adjusted gradient for AdaGrad
-                    # for grad, hist_grad in zip(total_grads, history_grads):
-                    #     grad /= batch_size
-                        # grad /= fudge_factor + np.sqrt(hist_grad)
+                    for grad, hist_grad in zip(total_grads, history_grads):
+                        # grad /= batch_size
+                        grad /= fudge_factor + np.sqrt(hist_grad)
                     grcnn.update_params(total_grads, learning_rate)
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    history_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 results = grcnn.compute_cost_and_gradient(self.senti_train_set[j], [self.senti_train_label[j]])
                 grads, cost = results[:-1], results[-1]
                 # Accumulate total gradients based on batch size
                 for grad, current_grad in zip(total_grads, grads):
                     grad += current_grad
+                # Accumulate history gradients based on batch size
+                for hist_grad, current_grad in zip(history_grads, grads):
+                    hist_grad += np.square(current_grad)
                 total_cost += cost
                 # Accumulate historical gradients
                 # for hist_grad, current_grad in zip(history_grads, grads):
