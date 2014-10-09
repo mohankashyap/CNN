@@ -28,6 +28,8 @@ from config import GrCNNConfiger
 
 # theano.config.mode='DebugMode'
 theano.config.omp=True
+theano.config.on_unused_input='ignore'
+np.set_printoptions(threshold=np.nan)
 
 class TestGrCNN(unittest.TestCase):
     def setUp(self):
@@ -121,7 +123,7 @@ class TestGrCNN(unittest.TestCase):
             total_cost = 0.0
             total_count = 0
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-            learning_rate = 1.0 / (1.0 + i/10)
+            learning_rate = 0.01 / (1.0 + i/10)
             for j in xrange(self.train_size):
                 if (j+1) % batch_size == 0: 
                     logger.debug('%6d @ %4d epoch' % (j+1, i))
@@ -133,10 +135,6 @@ class TestGrCNN(unittest.TestCase):
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 results = grcnn.compute_cost_and_gradient(self.senti_train_set[j], [self.senti_train_label[j]])
                 grads, cost = results[:-1], results[-1]
-                logger.debug('Cost %d @ %d epoch = %f' % (j, i, cost))
-                logger.debug('Gradients: ')
-                logger.debug(grads)
-
                 # Accumulate total gradients based on batch size
                 for grad, current_grad in zip(total_grads, grads):
                     grad += current_grad
@@ -147,6 +145,26 @@ class TestGrCNN(unittest.TestCase):
                 # Judge whether current instance can be classified correctly or not
                 prediction = grcnn.predict(self.senti_train_set[j])[0]
                 total_count += prediction == self.senti_train_label[j]
+                # # Debugging purpose
+                # hidden_rep = grcnn.show_hidden(self.senti_train_set[j], [self.senti_train_label[j]])
+                # hidden_compressed_rep = grcnn.show_compressed_hidden(self.senti_train_set[j], [self.senti_train_label[j]])
+                # output_rep = grcnn.show_output(self.senti_train_set[j], [self.senti_train_label[j]])
+                # logger.debug('=' * 50)
+                # logger.debug('Length of gradient vectors: %d' % len(grads))
+                # logger.debug('Hidden representation by GrCNN encoder: ')
+                # logger.debug(hidden_rep)
+                # logger.debug('Hidden compressed with dropout: ')
+                # logger.debug(hidden_compressed_rep)
+                # logger.debug('Output of the whole architecture: ')
+                # logger.debug(output_rep)
+                # logger.debug('prediction made by the whole system: ')
+                # logger.debug(prediction)
+                # logger.debug('Ground truth prediction: ')
+                # logger.debug(self.senti_train_label[j])
+                # logger.debug('Current cost: ')
+                # logger.debug(cost)
+                # logger.debug('Gradients: ')
+                # logger.debug(grads)
             logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(self.train_size)))
             correct_count = 0
             for j in xrange(self.test_size):

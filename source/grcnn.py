@@ -181,6 +181,7 @@ class GrCNN(object):
         self.params += self.hidden_layer.params
         # Softmax Component
         self.softmax_layer = SoftmaxLayer(self.compressed_hidden, (config.num_mlp, config.num_class))
+        self.raw_output = self.softmax_layer.output
         self.pred = self.softmax_layer.pred
         self.params += self.softmax_layer.params
         # Compute the total number of parameters in this model
@@ -210,6 +211,10 @@ class GrCNN(object):
         self.predict = theano.function(inputs=[self.input], outputs=self.pred)
         # Compute the gradient of the objective function with respect to the model parameters
         self.compute_cost_and_gradient = theano.function(inputs=[self.input, self.truth], outputs=self.gradparams+[self.cost])
+        # Output function for debugging purpose
+        self.show_hidden = theano.function(inputs=[self.input, self.truth], outputs=self.hidden)
+        self.show_compressed_hidden = theano.function(inputs=[self.input, self.truth], outputs=self.compressed_hidden)
+        self.show_output = theano.function(inputs=[self.input, self.truth], outputs=self.raw_output)
         if verbose:
             logger.debug('Architecture of GrCNN built finished, summarized as below: ')
             logger.debug('Input dimension: %d' % config.num_input)
