@@ -73,11 +73,12 @@ class GrCNNEncoder(object):
         # Save all the parameters into one batch
         self.params = [self.U, self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
         # Length of the time sequence
-        nsteps = self.input.shape[0]
+        self.nsteps = self.input.shape[0]
         # mask = T.alloc(1.0, nsteps, 1)
         self.pyramids, _ = theano.scan(fn=self._step_prop, 
+                                    sequences=T.arange(self.nsteps-1),
                                     outputs_info=[self.hidden0],
-                                    n_steps=nsteps-1)
+                                    n_steps=self.nsteps-1)
         self.output = self.pyramids[-1][0].dimshuffle('x', 0)
         # Compression -- Encoding function
         self.compress = theano.function(inputs=[self.input], outputs=self.output)
@@ -87,17 +88,15 @@ class GrCNNEncoder(object):
             logger.debug('Size of the hidden dimension: %d' % fan_out)
             logger.debug('Activation function: %s' % config.activation)
 
-    def _step_prop(self, current_level):
+    def _step_prop(self, iter, current_level):
         '''
         @current_level: Input matrix at current level. The first dimension corresponds to 
         the timestamp while the second dimension corresponds to the dimension of hidden representation
         '''
         # Build shifted matrix, due to the constraints of Theano.scan, we have to keep the shape of the
         # input and output matrix
-        right_current_level = T.zeros_like(current_level)
-        right_current_level = T.set_subtensor(right_current_level[:-1], current_level[1:])
-        left_current_level = T.zeros_like(current_level)
-        left_current_level = T.set_subtensor(left_current_level[:-1], current_level[:-1])
+        left_current_level = current_level[:self.nsteps-iter-1]
+        right_current_level = current_level[1:self.nsteps-iter]
         # Compute temporary central hidden representation, of size Txd, but we only care about the first
         # T-1 rows, i.e., we only focus on the (T-1)xd sub-matrix.
         central_current_level = self.act.activate(T.dot(left_current_level, self.Wl) + 
@@ -119,7 +118,7 @@ class GrCNNEncoder(object):
         next_level = left_gate * left_current_level + \
                      right_gate * right_current_level + \
                      central_gate * central_current_level
-        return next_level
+        return T.set_subtensor(current_level[:self.nsteps-iter-1], next_level)
 
     def _step_prop_reduce(self, current_level):
         '''
@@ -172,8 +171,13 @@ class GrCNN(object):
         # Activation function
         self.act = Activation(config.activation)
         # MLP Component
-        self.hidden_layer = HiddenLayer(self.hidden, (config.num_hidden, config.num_mlp), act=self.act)
+        self.hidden_layer = HiddenLayer(self.hidden, (config.num_hidden, config.num_mlp), act=Activation(config.hiddenact))
         self.compressed_hidden = self.hidden_layer.output
+        # Dropout regularization
+        srng = T.shared_randomstreams.RandomStreams(config.random_seed)
+        mask = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hidden.shape)
+        self.compressed_hidden *= T.cast(mask, floatX)
+        # Accumulate model parameters
         self.params += self.hidden_layer.params
         # Softmax Component
         self.softmax_layer = SoftmaxLayer(self.compressed_hidden, (config.num_mlp, config.num_class))
@@ -205,7 +209,7 @@ class GrCNN(object):
         self.objective = theano.function(inputs=[self.input, self.truth], outputs=self.cost)
         self.predict = theano.function(inputs=[self.input], outputs=self.pred)
         # Compute the gradient of the objective function with respect to the model parameters
-        self.compute_gradient = theano.function(inputs=[self.input, self.truth], outputs=self.gradparams)
+        self.compute_cost_and_gradient = theano.function(inputs=[self.input, self.truth], outputs=self.gradparams+[self.cost])
         if verbose:
             logger.debug('Architecture of GrCNN built finished, summarized as below: ')
             logger.debug('Input dimension: %d' % config.num_input)

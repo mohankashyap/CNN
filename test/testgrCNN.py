@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.DEBUG,
 sys.path.append('../source/')
 logger = logging.getLogger(__name__)
 
+theano.config.exception_verbosity='high'
+
 from grcnn import GrCNNEncoder
 from config import GrCNNConfiger
 
@@ -87,7 +89,7 @@ class TestGRCNN(unittest.TestCase):
         input_symbol = T.matrix()
         output_symbol = grcnn._step_prop_reduce(input_symbol)
         f = theano.function(inputs=[input_symbol], outputs=output_symbol)
-        time_steps = 60
+        time_steps = 600
         input_matrix = np.random.rand(time_steps, self.configer.num_input)
         input_matrix = input_matrix.astype(np.float32)
         # Timing for numpy iterative application
@@ -106,7 +108,7 @@ class TestGRCNN(unittest.TestCase):
         start_time = time.time()
         output_matrix = grcnn.compress(input_matrix)
         end_time = time.time()
-        logger.debug('Time used for manually iterative application: {} seconds.'.format(end_time-start_time))
+        logger.debug('Time used for Theano.scan implementation: {} seconds.'.format(end_time-start_time))
         logger.debug('Output Matrix Shape: {}'.format(output_matrix.shape))
         # logger.debug('Output Matrix by theano.scan compress function: ')
         # logger.debug(output_matrix)
