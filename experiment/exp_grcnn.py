@@ -14,6 +14,7 @@ import csv
 import theano
 import theano.tensor as T
 import numpy as np
+import scipy.io as sio
 # Set the basic configuration of the logging system
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -110,11 +111,14 @@ class TestGrCNN(unittest.TestCase):
         # Training
         start_time = time.time()
         # Loop over epochs
-        batch_size = 20
-        learning_rate = 1.0
+        batch_size = 100
+        learning_rate = 0.1
         fudge_factor = 1e-6
         logger.debug('GrCNN.params: {}'.format(grcnn.params))
         history_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+        # Save model parameters
+        initial_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+        sio.savemat('grcnn_initial.mat', initial_params)
         # Check
         for param in history_grads:
             logger.debug('Parameter Shape: {}'.format(param.shape))
@@ -125,11 +129,14 @@ class TestGrCNN(unittest.TestCase):
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             # learning_rate = 0.01 / (1.0 + i/10)
             for j in xrange(self.train_size):
+                if (j+1) % 1000 == 0:
+                    logger.debug('%4d @ %4d epoch' % (j+1, i))
+                    current_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+                    sio.savemat('grcnn_{}_{}.mat'.format(i, j), current_params)
                 if (j+1) % batch_size == 0 or j == self.train_size-1: 
-                    logger.debug('%6d @ %4d epoch' % (j+1, i))
                     # Adjusted gradient for AdaGrad
                     for grad, hist_grad in zip(total_grads, history_grads):
-                        # grad /= batch_size
+                        grad /= batch_size
                         grad /= fudge_factor + np.sqrt(hist_grad)
                     grcnn.update_params(total_grads, learning_rate)
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]

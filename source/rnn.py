@@ -336,8 +336,10 @@ class BRNN(object):
 		self.backward_h, _ = theano.scan(fn=backward_step, sequences=self.input, outputs_info=[self.h_end], 
 										 truncate_gradient=configs.bptt, go_backwards=True)
 		# Store the final value
-		self.h_start_star = self.forward_h[-1]
-		self.h_end_star = self.backward_h[-1]
+		# self.h_start_star = self.forward_h[-1]
+		# self.h_end_star = self.backward_h[-1]
+		self.h_start_star = T.mean(self.forward_h, axis=0)
+		self.h_end_star = T.mean(self.backward_h, axis=0)
 		# L1, L2 regularization
 		self.L1_norm = T.sum(T.abs_(self.W_forward) + T.abs_(self.W_backward) + \
 							 T.abs_(self.U_forward) + T.abs_(self.U_backward) + \
@@ -385,9 +387,9 @@ class BRNN(object):
 			pprint('Number of free parameters in BRNN: %d' % self.num_params)
 			pprint('*' * 50)
 
-	def train(self, input, truth, learn_rate):
-		cost = self.objective(input, truth, learn_rate)
-		return cost
+	# def train(self, input, truth, learn_rate):
+	# 	cost = self.objective(input, truth, learn_rate)
+	# 	return cost
 
 	# This method is used to implement the batch updating algorithm
 	def update_params(self, gradtheta, learn_rate):
@@ -405,30 +407,4 @@ class BRNN(object):
 	def load(fname):
 		with file(fname, 'rb') as fin:
 			return cPickle.load(fin)
-
-
-class BRNNSentence(BRNN):
-	'''
-	Bidirectional BRNN with gated (weighting) intermediate representation.
-	'''
-	def __init__(self, configs, verbose=True):
-		# Call parent's class method to build the basic architecture of BRNN
-		super(BRNN, self).__init__(configs, verbose)
-		if verbose:
-			pprint('*' * 50)
-			pprint('Finished constructing Bidirectional Recurrent Neural Network (BRNN) for Sentence model.')
-						
-
-
-
-
-
-
-
-
-
-
-
-
-
 

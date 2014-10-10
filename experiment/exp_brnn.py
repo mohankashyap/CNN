@@ -14,6 +14,7 @@ import theano.tensor as T
 import time
 import cPickle
 import unittest
+import logging
 from pprint import pprint
 
 sys.path.append('../source/')
@@ -21,9 +22,15 @@ from rnn import RNN, TBRNN, BRNN
 from config import RNNConfiger
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer
+from utils import floatX
 
 theano.config.openmp=True
 theano.config.exception_verbosity='high'
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M')
+logger = logging.getLogger(__name__)
 
 class TestBRNN(unittest.TestCase):
 	'''
@@ -36,7 +43,7 @@ class TestBRNN(unittest.TestCase):
 		in sentiment analysis task, preprocessing.
 		'''
 		np.random.seed(42)
-		senti_train_filename = '../data/sentiment-train-phrases.txt'
+		senti_train_filename = '../data/sentiment-train.txt'
 		senti_test_filename = '../data/sentiment-test.txt'
 		senti_train_txt, senti_train_label = [], []
 		senti_test_txt, senti_test_label = [], []
@@ -77,7 +84,7 @@ class TestBRNN(unittest.TestCase):
 				tmp_indices[-1] = self.blank_index
 				senti_test_words_label.append(tmp_indices)
 		end_time = time.time()
-		pprint('Time used to load training and test data set: %f seconds.' % (end_time-start_time))
+		logger.debug('Time used to load training and test data set: %f seconds.' % (end_time-start_time))
 		start_time = time.time()
 		# Store original word index representation
 		self.senti_train_words_label = senti_train_words_label
@@ -93,8 +100,8 @@ class TestBRNN(unittest.TestCase):
 		# Check size
 		assert train_size == self.senti_train_label.shape[0]
 		assert test_size == self.senti_test_label.shape[0]
-		pprint('Training size: %d' % train_size)
-		pprint('Test size: %d' % test_size)
+		logger.debug('Training size: %d' % train_size)
+		logger.debug('Test size: %d' % test_size)
 		# Sequential modeling for each sentence
 		self.senti_train_set, self.senti_test_set = [], []
 		senti_train_len, senti_test_len = [], []
@@ -102,7 +109,7 @@ class TestBRNN(unittest.TestCase):
 		for i, sent in enumerate(senti_train_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()))
+			vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()), dtype=floatX)
 			vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
 			senti_train_len.append(len(words)+2)
 			self.senti_train_set.append(vectors)
@@ -110,20 +117,20 @@ class TestBRNN(unittest.TestCase):
 		for i, sent in enumerate(senti_test_txt):
 			words = sent.split()
 			words = [word.lower() for word in words]
-			vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()))
+			vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()), dtype=floatX)
 			vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
 			senti_test_len.append(len(words)+2)
 			self.senti_test_set.append(vectors)
 		assert senti_train_len == [seq.shape[0] for seq in self.senti_train_set]
 		assert senti_test_len == [seq.shape[0] for seq in self.senti_test_set]
 		end_time = time.time()
-		pprint('Time used to build initial training and test matrix: %f seconds.' % (end_time-start_time))
+		logger.debug('Time used to build initial training and test matrix: %f seconds.' % (end_time-start_time))
 		# Store data
 		self.train_size = train_size
 		self.test_size = test_size
 		self.word_embedding = word_embedding
 
-	# @unittest.skip('Wait a minute')
+	@unittest.skip('Wait a minute')
 	def testTBRNNonSentiment(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
@@ -134,10 +141,10 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		# brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
 		end_time = time.time()
-		pprint('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
+		logger.debug('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
 		# Training
-		pprint('positive labels: %d' % np.sum(self.senti_train_label))
-		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
+		logger.debug('positive labels: %d' % np.sum(self.senti_train_label))
+		logger.debug('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		history_grads = np.zeros(brnn.num_params)
@@ -149,7 +156,7 @@ class TestBRNN(unittest.TestCase):
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params)
-			pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
+			logger.debug('Total number of parameters in TBRNN: %d' % brnn.num_params)
 			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 				# cost = brnn.train(train_seq, [train_label], learn_rate)
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
@@ -168,38 +175,38 @@ class TestBRNN(unittest.TestCase):
 			brnn.update_params(adjusted_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
 			accuracy = tot_count / float(self.train_size)
-			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
-			pprint('Confusion matrix: ')
-			pprint(conf_matrix)
-			pprint('-' * 50)
+			logger.debug('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
+			logger.debug('Confusion matrix: ')
+			logger.debug(conf_matrix)
+			logger.debug('-' * 50)
 			if (i+1) % 100 == 0:
-				pprint('=' * 50)
-				pprint('Test at epoch: %d' % i)
+				logger.debug('=' * 50)
+				logger.debug('Test at epoch: %d' % i)
 				# Testing
 				tot_count = 0
 				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
-				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-				pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-				pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
-				pprint('=' * 50)
+				logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
+				logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+				logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+				logger.debug('=' * 50)
 		end_time = time.time()
-		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
+		logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
 		tot_count = 0
 		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
 			prediction = brnn.predict(test_seq)[0]
 			tot_count += test_label == prediction
-		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
+		logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+		logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
 		# Re-testing on training set
 		tot_count = 0
 		for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
-		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
+		logger.debug('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
 		# Show representation for training inputs and testing inputs
 		start_time = time.time()
 		training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
@@ -208,9 +215,9 @@ class TestBRNN(unittest.TestCase):
 		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
 		# Save TBRNN
 		TBRNN.save('sentiment.brnn.Sep5_2.pkl', brnn)
-		pprint('Model successfully saved...')
+		logger.debug('Model successfully saved...')
 
-	@unittest.skip('Wait a minute')
+	# @unittest.skip('Wait a minute')
 	def testBRNNonSentiment(self):
 		# Set print precision
 		np.set_printoptions(threshold=np.nan)
@@ -218,16 +225,16 @@ class TestBRNN(unittest.TestCase):
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		brnn = BRNN.load('./sentiment.nbrnn.Sep5.pkl')
-		# brnn = BRNN(configer, verbose=True)
+		# brnn = BRNN.load('./sentiment.nbrnn.Sep5.pkl')
+		brnn = BRNN(configer, verbose=True)
 		end_time = time.time()
-		pprint('Time used to build BRNN: %f seconds.' % (end_time-start_time))
+		logger.debug('Time used to build BRNN: %f seconds.' % (end_time-start_time))
 		# Training
-		pprint('positive labels: %d' % np.sum(self.senti_train_label))
-		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
+		logger.debug('positive labels: %d' % np.sum(self.senti_train_label))
+		logger.debug('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
-		history_grads = np.zeros(brnn.num_params)
+		history_grads = np.zeros(brnn.num_params, dtype=floatX)
 		n_epoch = 2000
 		learn_rate = 1
 		fudge_factor = 1e-6
@@ -235,8 +242,8 @@ class TestBRNN(unittest.TestCase):
 			tot_count = 0
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
-			tot_grads = np.zeros(brnn.num_params)
-			pprint('Total number of parameters in BRNN: %d' % brnn.num_params)
+			tot_grads = np.zeros(brnn.num_params, dtype=floatX)
+			logger.debug('Total number of parameters in BRNN: %d' % brnn.num_params)
 			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
 				tot_grads += current_grads
@@ -254,59 +261,41 @@ class TestBRNN(unittest.TestCase):
 			brnn.update_params(adjusted_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
 			accuracy = tot_count / float(self.train_size)
-			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
-			pprint('Confusion matrix: ')
-			pprint(conf_matrix)
-			pprint('-' * 50)
+			logger.debug('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
+			logger.debug('Confusion matrix: ')
+			logger.debug(conf_matrix)
+			logger.debug('-' * 50)
 			if (i+1) % 100 == 0:
-				pprint('=' * 50)
-				pprint('Test at epoch: %d' % i)
+				logger.debug('=' * 50)
+				logger.debug('Test at epoch: %d' % i)
 				# Testing
 				tot_count = 0
 				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
-				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-				pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-				pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
-				pprint('=' * 50)
+				logger.degbu('Test accuracy: %f' % (tot_count / float(self.test_size)))
+				logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+				logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+				logger.debug('=' * 50)
 		end_time = time.time()
-		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
+		logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
 		tot_count = 0
 		for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
 			prediction = brnn.predict(test_seq)[0]
 			tot_count += test_label == prediction
-		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
+		logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+		logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
 		# Re-testing on training set
 		tot_count = 0
 		for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
-		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
-		# Show representation for training inputs and testing inputs
-		start_time = time.time()
-		training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
-		test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
-		training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
-		test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
-		for i, train_seq in enumerate(self.senti_train_set):
-			training_forward_rep[i, :] = brnn.show_forward(train_seq)
-			training_backward_rep[i, :] = brnn.show_backward(train_seq)
-		for i, test_seq in enumerate(self.senti_test_set):
-			test_forward_rep[i, :] = brnn.show_forward(test_seq)
-			test_backward_rep[i, :] = brnn.show_backward(test_seq)
-		end_time = time.time()
-		pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-		sio.savemat('./nBRNN-rep.mat', {'training_forward' : training_forward_rep, 
-									   'training_backward' : training_backward_rep, 
-									   'test_forward' : test_forward_rep, 
-									   'test_backward' : test_backward_rep})
+		logger.debug('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
 		# Save TBRNN
-		TBRNN.save('sentiment.nbrnn.Sep5_1.pkl', brnn)
-		pprint('Model successfully saved...')
+		TBRNN.save('sentiment.nbrnn.Oct.pkl', brnn)
+		logger.debug('Model successfully saved...')
 
 	@unittest.skip('Wait a minute')
 	def testTBRNNwithFineTuning(self):
@@ -319,11 +308,11 @@ class TestBRNN(unittest.TestCase):
 		brnn = TBRNN(configer, verbose=True)
 		# brnn = TBRNN.load('sentiment.brnn.Sep5.pkl')
 		end_time = time.time()
-		pprint('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
-		pprint('Start training TBRNN with fine-tuning...')
+		logger.debug('Time used to load TBRNN: %f seconds.' % (end_time-start_time))
+		logger.debug('Start training TBRNN with fine-tuning...')
 		# Training
-		pprint('positive labels: %d' % np.sum(self.senti_train_label))
-		pprint('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
+		logger.debug('positive labels: %d' % np.sum(self.senti_train_label))
+		logger.debug('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
 		# history_grads = np.zeros(brnn.num_params)
@@ -336,7 +325,7 @@ class TestBRNN(unittest.TestCase):
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params)
-			pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
+			logger.debug('Total number of parameters in TBRNN: %d' % brnn.num_params)
 			for train_indices, train_label in zip(self.senti_train_words_label, self.senti_train_label):
 				# Dynamically build training instances
 				train_seq = self.word_embedding._embedding[train_indices, :]
@@ -363,13 +352,13 @@ class TestBRNN(unittest.TestCase):
 			brnn.update_params(tot_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
 			accuracy = tot_count / float(self.train_size)
-			pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
-			pprint('Confusion matrix: ')
-			pprint(conf_matrix)
-			pprint('-' * 50)
+			logger.debug('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
+			logger.debug('Confusion matrix: ')
+			logger.debug(conf_matrix)
+			logger.debug('-' * 50)
 			if (i+1) % 100 == 0:
-				pprint('=' * 50)
-				pprint('Test at epoch: %d' % i)
+				logger.debug('=' * 50)
+				logger.debug('Test at epoch: %d' % i)
 				# Testing
 				tot_count = 0
 				for test_indices, test_label in zip(self.senti_test_words_label, self.senti_test_label):
@@ -377,12 +366,12 @@ class TestBRNN(unittest.TestCase):
 					test_seq = self.word_embedding._embedding[test_indices, :]
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
-				pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-				pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-				pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
-				pprint('=' * 50)
+				logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
+				logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+				logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+				logger.debug('=' * 50)
 		end_time = time.time()
-		pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
+		logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
 		tot_count = 0
 		for test_indices, test_label in zip(self.senti_test_set, self.senti_test_label):
@@ -390,22 +379,20 @@ class TestBRNN(unittest.TestCase):
 			test_seq = self.word_embedding._embedding[test_indices, :]
 			prediction = brnn.predict(test_seq)[0]
 			tot_count += test_label == prediction
-		pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-		pprint('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
-		pprint('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
+		logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
+		logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
+		logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
 		# Re-testing on training set
 		tot_count = 0
 		for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
 			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
-		pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
+		logger.debug('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
 		# Save new word-embedding on sentiment analysis task
 		WordEmbedding.save('word-embedding-sentiment.pkl', )
 		# Save TBRNN
 		TBRNN.save('sentiment.brnn.finetune.Sep5_1.pkl', brnn)
-		pprint('Model successfully saved...')
-
-
+		logger.debug('Model successfully saved...')
 
 if __name__ == '__main__':
 	unittest.main()

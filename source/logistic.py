@@ -32,8 +32,8 @@ class SoftmaxLayer(object):
 					np.random.uniform(low=-np.sqrt(6.0/(fan_in+fan_out)),
 									  high=np.sqrt(6.0/(fan_in+fan_out)),
 									  size=(num_in, num_out)), dtype=floatX),
-					name='W', borrow=True)
-		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b', borrow=True)
+					name='W_softmax', borrow=True)
+		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b_softmax', borrow=True)
 		self.output = T.nnet.softmax(T.dot(self.input, self.W) + self.b)
 		# Stack parameters
 		self.params = [self.W, self.b]

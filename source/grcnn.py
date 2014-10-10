@@ -51,30 +51,29 @@ class GrCNNEncoder(object):
                     np.random.uniform(low=-np.sqrt(6.0/(fan_out+fan_out)),
                                       high=np.sqrt(6.0/(fan_out+fan_out)),
                                       size=(fan_out, fan_out)), dtype=floatX),
-                    name='W^l', borrow=True)
+                    name='W_l', borrow=True)
         self.Wr = theano.shared(value=np.asarray(
                     np.random.uniform(low=-np.sqrt(6.0/(fan_out+fan_out)),
                                       high=np.sqrt(6.0/(fan_out+fan_out)),
                                       size=(fan_out, fan_out)), dtype=floatX),
-                    name='W^r', borrow=True)
+                    name='W_r', borrow=True)
         self.Wb = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='Wb', borrow=True)
         # G^l, G^r, parameters used to construct the three-way coefficients
         self.Gl = theano.shared(value=np.asarray(
                     np.random.uniform(low=-np.sqrt(6.0/(3+fan_out)),
                                       high=np.sqrt(6.0/(3+fan_out)),
                                       size=(fan_out, 3)), dtype=floatX),
-                    name='G^l', borrow=True)
+                    name='G_l', borrow=True)
         self.Gr = theano.shared(value=np.asarray(
                     np.random.uniform(low=-np.sqrt(6.0/(3+fan_out)),
                                       high=np.sqrt(6.0/(3+fan_out)),
                                       size=(fan_out, 3)), dtype=floatX),
-                    name='G^r', borrow=True)
+                    name='G_r', borrow=True)
         self.Gb = theano.shared(value=np.zeros(3, dtype=floatX), name='Gb', borrow=True)
         # Save all the parameters into one batch
         self.params = [self.U, self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
         # Length of the time sequence
         self.nsteps = self.input.shape[0]
-        # mask = T.alloc(1.0, nsteps, 1)
         self.pyramids, _ = theano.scan(fn=self._step_prop, 
                                     sequences=T.arange(self.nsteps-1),
                                     outputs_info=[self.hidden0],
@@ -262,7 +261,4 @@ class GrCNN(object):
         with file(fname, 'rb') as fin:
             model = cPickle.load(fin)
             return model
-
-
-
 
