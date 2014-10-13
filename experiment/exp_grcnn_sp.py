@@ -159,6 +159,7 @@ class TestGrCNNSP(unittest.TestCase):
                 # Judge whether current instance can be classified correctly or not  
                 prediction = grcnn.predict(self.sp_train_set[j])[0]
                 total_count += prediction == self.sp_train_label[j]
+                total_cost += cost
                 if (j+1) % batch_size == 0 or j == self.train_size-1:
                     # Adjusted gradient for AdaGrad
                     for grad, hist_grad in zip(total_grads, history_grads):
@@ -171,7 +172,7 @@ class TestGrCNNSP(unittest.TestCase):
             correct_count = 0
             for j in xrange(self.test_size):
                 plabel = grcnn.predict(self.sp_test_set[j])
-                if plabel == self.sp_set_label[j]: correct_count += 1
+                if plabel == self.sp_test_label[j]: correct_count += 1
             logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
         end_time = time.time()
         logger.debug('Time used for training: %f minutes.' % ((end_time-start_time) / 60))

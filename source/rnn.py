@@ -355,6 +355,10 @@ class BRNN(object):
 		##################################################################################
 		# Concatenate these two vectors into one
 		self.h = T.concatenate([self.h_start_star, self.h_end_star], axis=0)
+		# Dropout parameter
+		srng = T.shared_randomstreams.RandomStreams(configs.random_seed)
+		mask = srng.binomial(n=1, p=1-configs.dropout, size=self.h.shape)
+		self.h *= T.cast(mask, floatX)
 		# Use concatenated vector as input to the Softmax/MLP classifier
 		self.output = T.nnet.softmax(T.dot(self.h, self.W_softmax) + self.b_softmax)		
 		self.pred = T.argmax(self.output, axis=1)
