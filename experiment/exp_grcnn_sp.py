@@ -26,6 +26,7 @@ from grcnn import GrCNN
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer
 from utils import floatX
+from config import GrCNNConfiger
 # Set the basic configuration of the logging system
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -113,15 +114,83 @@ class TestGrCNNSP(unittest.TestCase):
         logger.debug('Sentence of maximum length in training set: %d' % max(sp_train_len))
         logger.debug('Sentence of maximum length in test set: %d' % max(sp_test_len))
 
-    
+    def testGrCNN(self):
+        # Set print precision
+        np.set_printoptions(threshold=np.nan)
+        config_filename = './grCNN.conf'
+        start_time = time.time()
+        configer = GrCNNConfiger(config_filename)
+        grcnn = GrCNN(configer, verbose=True) 
+        end_time = time.time()
+        logger.debug('Time used to build GrCNN: %f seconds.' % (end_time-start_time))
+        logger.debug('Positive labels: %d' % np.sum(self.sp_train_label))
+        logger.debug('Negative labels: %d' % (self.sp_train_label.shape[0]-np.sum(self.sp_train_label)))
+        # Training using GrCNN
+        start_time = time.time()
+        learn_rate = 1e-1
+        batch_size = 100
+        fudge_factor = 1e-6
+        logger.debug('GrCNN.params: {}'.format(grcnn.params))
+        history_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+        initial_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+        sio.savemat('grcnn_initial.mat', initial_params)
+        # Check parameter size
+        for param in history_grads:
+            logger.debug('Parameter Shape: {}'.format(param.shape))
+        for i in xrange(configer.nepoch):
+            # Loop over training instances
+            total_cost = 0.0
+            total_count = 0
+            total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            # AdaGrad
+            for j in xrange(self.train_size):
+                if (j+1) % 1000 == 0:
+                    logger.debug('%4d @ %4d eopch' % (j+1, i))
+                    current_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+                    sio.savemat('grcnn_{}_{}.mat'.format(i, j+1), current_params)
+                results = grcnn.compute_cost_and_gradient(self.senti_train_set[j], [self.senti_train_labe[j]])
+                grads, cost = results[:-1], results[-1]
+                # Accumulate total gradients based on batch size
+                for grad, current_grad in zip(total_grads, grads):
+                    grad += current_grad
+                # Accumulate history gradients based on batch size
+                for hist_grad, current_grad in zip(history_grads, grads):
+                    hist_grad += np.square(current_grad)
+                # Judge whether current instance can be classified correctly or not  
+                prediction = grcnn.predict(self.senti_train_set[j])[0]
+                total_count += prediction == self.senti_train_label[j]
+                if (j+1) % batch_size == 0 or j == self.train_size-1:
+                    # Adjusted gradient for AdaGrad
+                    for grad, hist_grad in zip(total_grads, history_grads):
+                        grad /= batch_size
+                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    grcnn.update_params(total_grads, learn_rate)
+                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    history_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(self.train_size)))
+            correct_count = 0
+            for j in xrange(self.test_size):
+                plabel = grcnn.predict(self.senti_test_set[j])
+                if plabel == self.senti_set_label[j]: correct_count += 1
+            logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
+        end_time = time.time()
+        logger.debug('Time used for training: %f minutes.' % ((end_time-start_time) / 60))
+        # Final total test
+        start_time = time.time()
+        correct_count = 0
+        for j in xrange(self.test_size):
+            plabel = grcnn.predict(self.senti_test_set[j])
+            if plabel == self.senti_test_label[j]: correct_count += 1
+        end_time = time.time()
+        logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
+        logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
+        # Save current model
+        GrCNN.save('./subjective-passive.grcnn', grcnn)
 
 
 
-
-
-
-
-
+if __name__ == '__main__':
+    unittest.main()
 
 
 

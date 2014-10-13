@@ -150,9 +150,6 @@ class TestGrCNN(unittest.TestCase):
                 for hist_grad, current_grad in zip(history_grads, grads):
                     hist_grad += np.square(current_grad)
                 total_cost += cost
-                # Accumulate historical gradients
-                # for hist_grad, current_grad in zip(history_grads, grads):
-                #     hist_grad += np.square(current_grad)
                 # Judge whether current instance can be classified correctly or not
                 prediction = grcnn.predict(self.senti_train_set[j])[0]
                 total_count += prediction == self.senti_train_label[j]
