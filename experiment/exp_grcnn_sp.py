@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 
 theano.config.openmp=True
-
+theano.config.on_unused_input='ignore'
 
 class TestGrCNNSP(unittest.TestCase):
     '''
@@ -71,7 +71,7 @@ class TestGrCNNSP(unittest.TestCase):
         self.blank_token = word_embedding.wordvec('</s>')
         # Store original text representation
         self.sp_train_txt = sp_train_txt
-        self.sp_test_txt = sp_text_txt
+        self.sp_test_txt = sp_test_txt
         # Store original label
         self.sp_train_label = np.asarray(sp_train_label, dtype=np.int32)
         self.sp_test_label = np.asarray(sp_test_label, dtype=np.int32)
@@ -106,7 +106,7 @@ class TestGrCNNSP(unittest.TestCase):
         assert sp_train_len == [seq.shape[0] for seq in self.sp_train_set]
         assert sp_test_len == [seq.shape[0] for seq in self.sp_test_set]
         end_time = time.time()
-        logger.debug('Time used to build initial training and test matrix: %f seconds'. % (end_time-start_time))
+        logger.debug('Time used to build initial training and test matrix: %f seconds' % (end_time-start_time))
         # Store metadata
         self.train_size = train_size
         self.test_size = test_size
@@ -148,7 +148,7 @@ class TestGrCNNSP(unittest.TestCase):
                     logger.debug('%4d @ %4d eopch' % (j+1, i))
                     current_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
                     sio.savemat('grcnn_{}_{}.mat'.format(i, j+1), current_params)
-                results = grcnn.compute_cost_and_gradient(self.senti_train_set[j], [self.senti_train_labe[j]])
+                results = grcnn.compute_cost_and_gradient(self.sp_train_set[j], [self.sp_train_label[j]])
                 grads, cost = results[:-1], results[-1]
                 # Accumulate total gradients based on batch size
                 for grad, current_grad in zip(total_grads, grads):
@@ -157,8 +157,8 @@ class TestGrCNNSP(unittest.TestCase):
                 for hist_grad, current_grad in zip(history_grads, grads):
                     hist_grad += np.square(current_grad)
                 # Judge whether current instance can be classified correctly or not  
-                prediction = grcnn.predict(self.senti_train_set[j])[0]
-                total_count += prediction == self.senti_train_label[j]
+                prediction = grcnn.predict(self.sp_train_set[j])[0]
+                total_count += prediction == self.sp_train_label[j]
                 if (j+1) % batch_size == 0 or j == self.train_size-1:
                     # Adjusted gradient for AdaGrad
                     for grad, hist_grad in zip(total_grads, history_grads):
@@ -170,8 +170,8 @@ class TestGrCNNSP(unittest.TestCase):
             logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(self.train_size)))
             correct_count = 0
             for j in xrange(self.test_size):
-                plabel = grcnn.predict(self.senti_test_set[j])
-                if plabel == self.senti_set_label[j]: correct_count += 1
+                plabel = grcnn.predict(self.sp_test_set[j])
+                if plabel == self.sp_set_label[j]: correct_count += 1
             logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
         end_time = time.time()
         logger.debug('Time used for training: %f minutes.' % ((end_time-start_time) / 60))
@@ -179,7 +179,7 @@ class TestGrCNNSP(unittest.TestCase):
         start_time = time.time()
         correct_count = 0
         for j in xrange(self.test_size):
-            plabel = grcnn.predict(self.senti_test_set[j])
+            plabel = grcnn.predict(self.sp_test_set[j])
             if plabel == self.senti_test_label[j]: correct_count += 1
         end_time = time.time()
         logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
