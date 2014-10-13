@@ -225,8 +225,8 @@ class TestBRNN(unittest.TestCase):
 		config_filename = './sentiment_brnn.conf'
 		start_time = time.time()
 		configer = RNNConfiger(config_filename)
-		# brnn = BRNN.load('./sentiment.nbrnn.Sep5.pkl')
-		brnn = BRNN(configer, verbose=True)
+		brnn = BRNN.load('./sentiment.nbrnn.Oct.pkl')
+		# brnn = BRNN(configer, verbose=True)
 		end_time = time.time()
 		logger.debug('Time used to build BRNN: %f seconds.' % (end_time-start_time))
 		# Training
@@ -234,38 +234,44 @@ class TestBRNN(unittest.TestCase):
 		logger.debug('negative labels: %d' % (self.senti_train_label.shape[0]-np.sum(self.senti_train_label)))
 		start_time = time.time()
 		## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
-		history_grads = np.zeros(brnn.num_params, dtype=floatX)
+		# history_grads = np.zeros(brnn.num_params, dtype=floatX)
 		n_epoch = 2000
-		learn_rate = 1
+		learn_rate = 0.1
 		fudge_factor = 1e-6
+		batch_size = 200
 		for i in xrange(n_epoch):
+			learn_rate = 0.1 / (1 + i/100)
 			tot_count = 0
 			tot_error = 0.0
 			conf_matrix = np.zeros((2, 2), dtype=np.int32)
 			tot_grads = np.zeros(brnn.num_params, dtype=floatX)
-			logger.debug('Total number of parameters in BRNN: %d' % brnn.num_params)
-			for train_seq, train_label in zip(self.senti_train_set, self.senti_train_label):
+			for j, (train_seq, train_label) in enumerate(zip(self.senti_train_set, self.senti_train_label)):
+				# Reach a pre-specified batch size, updating the gradients
+				if (j+1) % batch_size == 0:
+					tot_grads /= batch_size
+					brnn.update_params(tot_grads, learn_rate)
+					tot_grads = np.zeros(brnn.num_params, dtype=floatX)
 				cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
 				tot_grads += current_grads
 				tot_error += cost
 				# historical gradient accumulation
-				history_grads += current_grads ** 2
+				# history_grads += current_grads ** 2
 				# predict current training label
 				prediction = brnn.predict(train_seq)[0]
 				tot_count += prediction == train_label
 				conf_matrix[train_label, prediction] += 1
-			# Batch updating 
-			tot_grads /= self.train_size
-			# Update historical gradient vector
-			adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
-			brnn.update_params(adjusted_grads, learn_rate)
+			# # Batch updating 
+			# tot_grads /= self.train_size
+			# # Update historical gradient vector
+			# adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
+			# brnn.update_params(adjusted_grads, learn_rate)
 			# End of the core AdaGrad updating algorithm
 			accuracy = tot_count / float(self.train_size)
 			logger.debug('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
 			logger.debug('Confusion matrix: ')
 			logger.debug(conf_matrix)
 			logger.debug('-' * 50)
-			if (i+1) % 100 == 0:
+			if (i+1) % 10 == 0:
 				logger.debug('=' * 50)
 				logger.debug('Test at epoch: %d' % i)
 				# Testing
@@ -273,10 +279,11 @@ class TestBRNN(unittest.TestCase):
 				for test_seq, test_label in zip(self.senti_test_set, self.senti_test_label):
 					prediction = brnn.predict(test_seq)[0]
 					tot_count += test_label == prediction
-				logger.degbu('Test accuracy: %f' % (tot_count / float(self.test_size)))
+				logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
 				logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.senti_test_label==1) / float(self.test_size)))
 				logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.senti_test_label==0) / float(self.test_size)))
 				logger.debug('=' * 50)
+				BRNN.save('sentiment.nbrnn.Oct.pkl', brnn)
 		end_time = time.time()
 		logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
 		# Testing
@@ -293,8 +300,8 @@ class TestBRNN(unittest.TestCase):
 			prediction = brnn.predict(train_seq)[0]
 			tot_count += train_label == prediction
 		logger.debug('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
-		# Save TBRNN
-		TBRNN.save('sentiment.nbrnn.Oct.pkl', brnn)
+		# Save BRNN
+		BRNN.save('sentiment.nbrnn.Oct.pkl', brnn)
 		logger.debug('Model successfully saved...')
 
 	@unittest.skip('Wait a minute')
