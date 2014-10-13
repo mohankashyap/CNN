@@ -387,10 +387,6 @@ class BRNN(object):
 			pprint('Number of free parameters in BRNN: %d' % self.num_params)
 			pprint('*' * 50)
 
-	# def train(self, input, truth, learn_rate):
-	# 	cost = self.objective(input, truth, learn_rate)
-	# 	return cost
-
 	# This method is used to implement the batch updating algorithm
 	def update_params(self, gradtheta, learn_rate):
 		# gradparams is a single long vector which can be used to update self.theta
