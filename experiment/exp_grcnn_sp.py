@@ -181,7 +181,7 @@ class TestGrCNNSP(unittest.TestCase):
         correct_count = 0
         for j in xrange(self.test_size):
             plabel = grcnn.predict(self.sp_test_set[j])
-            if plabel == self.senti_test_label[j]: correct_count += 1
+            if plabel == self.sp_test_label[j]: correct_count += 1
         end_time = time.time()
         logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
         logger.debug('Test accuracy: %f' % (correct_count / float(self.test_size)))
