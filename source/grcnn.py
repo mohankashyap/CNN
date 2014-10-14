@@ -324,7 +324,7 @@ class GrCNNMatcher(object):
             self.updates.append((param, param-self.learn_rate*gradparam))
         # Compile theano function
         self.objective = theano.function(inputs=[self.inputL, self.inputR, self.truth], outputs=self.cost)
-        self.predict = theano.function(intpus=[self.inputL, self.inputR], outputs=self.pred)
+        self.predict = theano.function(inputs=[self.inputL, self.inputR], outputs=self.pred)
         # Compute the gradient of the objective function with respect to the model parameters
         self.compute_cost_and_gradient = theano.function(inputs=[self.inputL, self.inputR, self.truth], 
                                                 outputs=self.gradparams+[self.cost])

@@ -145,7 +145,7 @@ class TestGrCNNSP(unittest.TestCase):
             # AdaGrad
             for j in xrange(self.train_size):
                 if (j+1) % 1000 == 0:
-                    logger.debug('%4d @ %4d eopch' % (j+1, i))
+                    logger.debug('%4d @ %4d epoch' % (j+1, i))
                     current_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
                     sio.savemat('grcnn_{}_{}.mat'.format(i, j+1), current_params)
                 results = grcnn.compute_cost_and_gradient(self.sp_train_set[j], [self.sp_train_label[j]])

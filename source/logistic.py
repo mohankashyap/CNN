@@ -35,7 +35,7 @@ class LogisticLayer(object):
 		self.params = [self.W, self.b]
 		# Prediction for classification
 		self.pred = self.output >= 0.5
-		self.predict = thenao.function(inputs=[self.input], outputs=self.pred)
+		self.predict = theano.function(inputs=[self.input], outputs=self.pred)
 
 	def NLL_loss(self, truth):
 		'''
@@ -48,7 +48,7 @@ class LogisticLayer(object):
 
 	def L2_loss(self):
 		return T.sum(self.W ** 2)
-		
+
 
 class SoftmaxLayer(object):
 	'''
