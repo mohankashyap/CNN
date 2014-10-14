@@ -368,18 +368,3 @@ class GrCNNMatcher(object):
             model = cPickle.load(fin)
             return model
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
