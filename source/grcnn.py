@@ -327,7 +327,7 @@ class GrCNNMatcher(object):
         self.predict = theano.function(inputs=[self.inputL, self.inputR], outputs=self.pred)
         # Compute the gradient of the objective function with respect to the model parameters
         self.compute_cost_and_gradient = theano.function(inputs=[self.inputL, self.inputR, self.truth], 
-                                                outputs=self.gradparams+[self.cost])
+                                                outputs=self.gradparams+[self.cost, self.pred])
         # Output function for debugging purpose
         self.show_hidden = theano.function(inputs=[self.inputL, self.inputR, self.truth], outputs=self.hidden)
         self.show_compressed_hidden = theano.function(inputs=[self.inputL, self.inputR, self.truth], outputs=self.compressed_hidden)

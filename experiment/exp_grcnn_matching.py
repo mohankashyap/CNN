@@ -16,7 +16,10 @@ import csv
 import time
 import cPickle
 import logging
+import traceback
+import random
 
+from threading import Thread
 from pprint import pprint
 
 sys.path.append('../source/')
@@ -131,6 +134,9 @@ class TestGrCNNMatcher(unittest.TestCase):
         test_index = [(i, i) for i in xrange(self.test_size)]
         test_index += [(np.random.randint(self.test_size), np.random.randint(self.test_size)) 
                         for _ in xrange(self.test_size * ratio)]
+        # Random shuffle training and test index
+        random.shuffle(train_index)
+        random.shuffle(test_index)
         # Begin training
         start_time = time.time()
         # Using AdaGrad learning algorithm
@@ -144,41 +150,133 @@ class TestGrCNNMatcher(unittest.TestCase):
         # Check parameter size
         for param in hist_grads:
             logger.debug('Parameter Shape: {}'.format(param.shape))
+        # Build training and test labels
+        train_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in train_index])
+        test_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in test_index])
         try: 
+            # Multi-threading process for each batch
+            num_threads = 20
+            threads = [None] * num_threads
+            results = [None] * num_threads
+            # Local processing function for each thread
+            def thread_process(idx, start_idx, end_idx):
+                '''
+                @idx: Int. Store result in the idx th cell.
+                @start_idx: Int. Starting index of current processing, inclusive.
+                @end_idx: Int. Ending index of current processing, exclusive.
+                '''
+                grads, costs, preds = [], 0.0, []
+                for k in xrange(start_idx, end_idx):
+                    pidx, qidx = self.train_index[k][0], self.train_index[k][1]
+                    label = 1 if pidx == qidx else 0
+                    r = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
+                                                        self.train_pairs_set[qidx][1],
+                                                        [label])
+                    grad, cost, pred = r[:-2], r[-2], r[-1]
+                    if len(grads) == 0:
+                        grads, costs, preds = grad, cost, pred
+                    else:
+                        for gt, g in zip(grads, grad):
+                            gt += g
+                        costs += cost
+                        preds += pred
+                # Each element of results is a three-element tuple, where the first element
+                # accumulates the gradients, the second element accumulate the cost and the 
+                # third element store the predictions
+                results[idx] = (grads, costs, preds)
+
             for i in xrange(configer.nepoch):
                 # Looper over training instances
                 total_cost = 0.0
                 total_count = 0
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                # AdaGrad
-                for j, (pidx, qidx) in enumerate(train_index):
-                    if (j+1) % 10000 == 0: logger.debug('%4d @ %4d epoch' % (j+1, i))
+                total_predictions = []
+                # Compute the number of batches
+                num_batch = len(train_index) / batch_size
+                # Parallel computing inside each batch
+                for j in xrange(num_batch):
+                    if j * batch_size == 10000: logger.debug('%8d @ %4d epoch' % (j, i))
+                    start_idx = j * batch_size
+                    step = batch_size / num_threads
+                    for k in xrange(num_threads):
+                        threads[k] = Thread(target=thread_process, args=(k, start_idx, start_idx+step))
+                        threads[k].start()
+                        start_idx += step
+                    # Threads working
+                    for k in xrange(num_threads):
+                        threads[k].join()
+                    # Accumulate results
+                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    for result in results:
+                        grad, cost, pred = result[0], result[1], result[2]
+                        for gt, g in zip(total_grads, grad):
+                            gt += g
+                        for gt, g in zip(hist_grads, grad):
+                            gt += np.square(g)
+                        total_cost += cost
+                        total_predictions += pred
+                    # AdaGrad updating
+                    for grad, hist_grad in zip(total_grads, hist_grads):
+                        grad /= batch_size
+                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    grcnn.update_params(total_grads, learn_rate)
+                # Update all the rests
+                for j in xrange(num_batch * batch_size, len(train_index)):
+                    pidx, qidx = train_index[j][0], train_index[j][1]
                     label = 1 if pidx == qidx else 0
-                    results = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
-                                                              self.train_pairs_set[qidx][1], 
-                                                              label)
-                    grads, cost = results[:-1], results[-1]
-                    # Accumulate total gradients based on batch size
-                    for tot_grad, grad in zip(tot_grads, grads):
-                        tot_grad += grad
-                    # Accumulate historical gradients based on batch size
-                    for hist_grad, grad in zip(hist_grads, grads):
-                        hist_grad += np.square(grad)
-                    # Judge whether current instance can be classified correctly or not
-                    prediction = grcnn.predict(self.train_pairs_set[pidx][0], 
-                                               self.train_pairs_set[qidx][1])[0]
-                    total_count += prediction == label
-                    total_cost += cost
-                    # Update parameters based on batch mode
-                    if (j+1) % batch_size == 0 or j == len(train_index)-1:
-                        # AdaGrad 
-                        for grad, hist_grad in zip(total_grads, hist_grads):
-                            grad /= batch_size
-                            grad /= fudge_factor + np.sqrt(hist_grad)
-                        grcnn.update_params(total_grads, learn_rate)
-                        total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                        hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_countn / float(len(train_index))))
+                    r = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
+                                                        self.train_paris_set[qidx][1],
+                                                        [label])
+                    grad, cost, pred = r[:-2], r[-2], r[-1]
+                    # Accumulate results
+                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    for result in results:
+                        grad, cost, pred = result[0], result[1], result[2]
+                        for gt, g in zip(total_grads, grad):
+                            gt += g
+                        for gt, g in zip(hist_grads, grad):
+                            gt += np.square(g)
+                        total_cost += cost
+                        total_predictions += pred
+                    # AdaGrad updating
+                    for grad, hist_grad in zip(total_grads, hist_grads):
+                        grad /= len(train_index) - num_batch*batch_size
+                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    grcnn.update_params(total_grads, learn_rate)
+                # Compute training error
+                total_predictions = np.asarray(total_predictions)
+                total_count = np.sum(total_predictions == train_labels)
+                # # AdaGrad
+                # for j, (pidx, qidx) in enumerate(train_index):
+                #     if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
+                #     label = 1 if pidx == qidx else 0
+                #     results = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
+                #                                               self.train_pairs_set[qidx][1], 
+                #                                               [label])
+                #     grads, cost = results[:-1], results[-1]
+                #     # Accumulate total gradients based on batch size
+                #     for tot_grad, grad in zip(total_grads, grads):
+                #         tot_grad += grad
+                #     # Accumulate historical gradients based on batch size
+                #     for hist_grad, grad in zip(hist_grads, grads):
+                #         hist_grad += np.square(grad)
+                #     # Judge whether current instance can be classified correctly or not
+                #     prediction = grcnn.predict(self.train_pairs_set[pidx][0], 
+                #                                self.train_pairs_set[qidx][1])[0]
+                #     total_count += prediction == label
+                #     total_cost += cost
+                #     # Update parameters based on batch mode
+                #     if (j+1) % batch_size == 0 or j == len(train_index)-1:
+                #         # AdaGrad 
+                #         for grad, hist_grad in zip(total_grads, hist_grads):
+                #             grad /= batch_size
+                #             grad /= fudge_factor + np.sqrt(hist_grad)
+                #         grcnn.update_params(total_grads, learn_rate)
+                #         total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                #         hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(len(train_index))))
                 correct_count = 0
                 for j, (pidx, qidx) in enumerate(test_index):
                     label = 1 if pidx == qidx else 0
@@ -198,7 +296,10 @@ class TestGrCNNMatcher(unittest.TestCase):
             logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
             logger.debug('Test accuracy: %f' % (correct_count / float(len(test_index))))
         except:
-            logger.debug('Error!!!')
+            logger.debug('!!!Error!!!')
+            logger.debug('-' * 60)
+            traceback.print_exc(file=sys.stdout)
+            logger.debug('-' * 60)
         finally:            
             final_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
             sio.savemat('grcnn_matcher_final.mat', initial_params)
