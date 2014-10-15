@@ -49,8 +49,10 @@ class TestGrCNNMatcher(unittest.TestCase):
         Load training and test data set, also, load word-embeddings.
         '''
         np.random.seed(42)
-        matching_train_filename = '../data/pair_all_sentence_train.txt'
-        matching_test_filename = '../data/pair_sentence_test.txt'
+        # matching_train_filename = '../data/pair_all_sentence_train.txt'
+        # matching_test_filename = '../data/pair_sentence_test.txt'
+        matching_train_filename = '../data/small_pair_train.txt'
+        matching_test_filename = '../data/small_pair_test.txt'
         train_pairs_txt, test_pairs_txt = [], []
         # Loading training and test pairs
         start_time = time.time()
@@ -155,7 +157,7 @@ class TestGrCNNMatcher(unittest.TestCase):
         test_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in test_index])
         try: 
             # Multi-threading process for each batch
-            num_threads = 20
+            num_threads = 1
             threads = [None] * num_threads
             results = [None] * num_threads
             # Local processing function for each thread
@@ -166,9 +168,12 @@ class TestGrCNNMatcher(unittest.TestCase):
                 @end_idx: Int. Ending index of current processing, exclusive.
                 '''
                 grads, costs, preds = [], 0.0, []
-                for k in xrange(start_idx, end_idx):
-                    pidx, qidx = self.train_index[k][0], self.train_index[k][1]
+                for t in xrange(start_idx, end_idx):
+                    pidx, qidx = train_index[t][0], train_index[t][1]
                     label = 1 if pidx == qidx else 0
+                    # logger.debug('Instance %d, sentence 1: %d, sentence 2: %d' % (t, 
+                        # self.train_pairs_set[pidx][0].shape[0], self.train_pairs_set[qidx][1].shape[0]))
+
                     r = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
                                                         self.train_pairs_set[qidx][1],
                                                         [label])
@@ -189,13 +194,12 @@ class TestGrCNNMatcher(unittest.TestCase):
                 # Looper over training instances
                 total_cost = 0.0
                 total_count = 0
-                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 total_predictions = []
                 # Compute the number of batches
                 num_batch = len(train_index) / batch_size
                 # Parallel computing inside each batch
                 for j in xrange(num_batch):
-                    if j * batch_size == 10000: logger.debug('%8d @ %4d epoch' % (j, i))
+                    if (j * batch_size) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j*batch_size, i))
                     start_idx = j * batch_size
                     step = batch_size / num_threads
                     for k in xrange(num_threads):
@@ -299,6 +303,9 @@ class TestGrCNNMatcher(unittest.TestCase):
             logger.debug('!!!Error!!!')
             logger.debug('-' * 60)
             traceback.print_exc(file=sys.stdout)
+            logger.debug('Current value of K = {}'.format(k))
+            logger.debug('First sentence: {}'.format(self.train_pairs_set[pidx][0].shape))
+            logger.debug('Second sentence: {}'.format(self.train_pairs_set[qidx][1].shape))
             logger.debug('-' * 60)
         finally:            
             final_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
