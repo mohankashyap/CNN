@@ -45,13 +45,17 @@ theano.config.on_unused_input='ignore'
 parser = argparse.ArgumentParser()
 parser.add_argument('nkerns', help='Specify the number of cpu kernels to be used.', 
                     type=int)
+parser.add_argument('-s', '--size', help='The size of each batch used to be trained.',
+                    type=int, default=2000)
+parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
+                    type=float, default=1.0)
 args = parser.parse_args()
 
 np.random.seed(42)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
-# matching_train_filename = '../data/small_pair_train.txt'
-# matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/small_pair_train.txt'
+matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -138,8 +142,8 @@ random.shuffle(train_index)
 random.shuffle(test_index)
 # Begin training
 # Using AdaGrad learning algorithm
-learn_rate = 1
-batch_size = 2000
+learn_rate = args.rate
+batch_size = args.size
 fudge_factor = 1e-6
 logger.debug('GrCNNMatcher.params: {}'.format(grcnn.params))
 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -221,22 +225,21 @@ try:
                 grad /= batch_size
                 grad /= fudge_factor + np.sqrt(hist_grad)
             grcnn.update_params(total_grads, learn_rate)
+
         # Update all the rests
         for j in xrange(num_batch * batch_size, len(train_instances)):
             (sentL, sentR), label = train_instances[j]
-            r = grcnn.compute_cost_and_gradient(sentL, sentR, label) 
+            r = grcnn.compute_cost_and_gradient(sentL, sentR, [label]) 
             grad, cost, pred = r[:-2], r[-2], r[-1]
             # Accumulate results
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-            for result in results:
-                grad, cost, pred = result[0], result[1], result[2]
-                for gt, g in zip(total_grads, grad):
-                    gt += g
-                for gt, g in zip(hist_grads, grad):
-                    gt += np.square(g)
-                total_cost += cost
-                total_predictions += pred
+            for gt, g in zip(total_grads, grad):
+                gt += g
+            for gt, g in zip(hist_grads, grad):
+                gt += np.square(g)
+            total_cost += cost
+            total_predictions.append(pred[0])
             # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
                 grad /= len(train_index) - num_batch*batch_size
@@ -244,7 +247,9 @@ try:
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)
+        train_labels = np.asarray(train_labels)
         total_count = np.sum(total_predictions == train_labels)
+        # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(len(train_index))))
         correct_count = 0
         for j in xrange(len(test_instances)):
