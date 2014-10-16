@@ -27,7 +27,7 @@ class LogisticLayer(object):
 		self.W = theano.shared(value=np.asarray(
 					np.random.uniform(low=-np.sqrt(6.0/(num_in+1)),
 									  high=np.sqrt(6.0/(num_in+1)),
-									  size=(num_in, 1)), dtype=floatX),
+									  size=(num_in)), dtype=floatX),
 					name='W_logistic', borrow=True)
 		self.b = theano.shared(value=np.zeros(1, dtype=floatX), name='b_logistic', borrow=True)
 		self.output = T.nnet.sigmoid(T.dot(self.input, self.W) + self.b)

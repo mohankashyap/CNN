@@ -35,7 +35,7 @@ from config import GrCNNConfiger
 # Set the basic configuration of the logging system
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
-                    datefmt='%m-%d %H:%M')
+                    datefmt='%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
 theano.config.openmp=True
@@ -109,7 +109,7 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 
 # Set print precision
-np.set_printoptions(threshold=np.nan)
+# np.set_printoptions(threshold=np.nan)
 config_filename = './grCNN.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
@@ -132,7 +132,7 @@ random.shuffle(train_index)
 random.shuffle(test_index)
 # Begin training
 # Using AdaGrad learning algorithm
-learn_rate = 1e-1
+learn_rate = 1
 batch_size = 2000
 fudge_factor = 1e-6
 logger.debug('GrCNNMatcher.params: {}'.format(grcnn.params))
@@ -158,22 +158,14 @@ logger.debug('Time used to build zipping training and test instances: %f seconds
 try: 
     start_time = time.time()
     # Multi-processes for batch learning
-    num_processes = 4
+    num_processes = 10
     def parallel_process(start_idx, end_idx):
         grads, costs, preds = [], 0.0, []
         for (sentL, sentR), label in train_instances[start_idx: end_idx]:
             r = grcnn.compute_cost_and_gradient(sentL, sentR, [label])
             grad, cost, pred = r[:-2], r[-2], r[-1]
-
-            logger.debug('=' * 50)
-            logger.debug('In parallel_process: ')
-            logger.debug('Gradients: ')
-            logger.debug(grad)
-            logger.debug('Cost = {}'.format(cost))
-            logger.debug('Prediction = {}'.format(pred))
-
             if len(grads) == 0:
-                grads, costs, preds = grad, cost, pred
+                grads, costs, preds = grad, cost, [pred[0]]
             else:
                 for gt, g in zip(grads, grad):
                     gt += g
@@ -212,15 +204,6 @@ try:
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             for result in results:
                 grad, cost, pred = result[0], result[1], result[2]
-
-                logger.debug('*' * 50)
-                logger.debug('Shape of gradient information: ')
-                for g in grad:
-                    logger.debug(g.shape)
-                logger.debug('Cost: {}'.format(cost))
-                logger.debug('Prediction: {}'.format(pred))
-
-
                 for gt, g in zip(total_grads, grad):
                     gt += g
                 for gt, g in zip(hist_grads, grad):
@@ -281,7 +264,6 @@ except:
     if pool != None:
         logger.debug('Quiting all subprocesses...')
         pool.terminate()
-        pool.wait()
     traceback.print_exc(file=sys.stdout)
 finally:            
     final_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
