@@ -166,7 +166,7 @@ class TestGrCNNMatcher(unittest.TestCase):
         start_time = time.time()
         # Using AdaGrad learning algorithm
         learn_rate = 1e-1
-        batch_size = 100
+        batch_size = 2000
         fudge_factor = 1e-6
         logger.debug('GrCNNMatcher.params: {}'.format(grcnn.params))
         hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -183,7 +183,7 @@ class TestGrCNNMatcher(unittest.TestCase):
         test_instances = zip(test_pairs_set, test_labels)
         try: 
             # Multi-processes for batch learning
-            num_processes = 4
+            num_processes = 10
             for i in xrange(configer.nepoch):
                 # Looper over training instances
                 total_cost = 0.0
@@ -206,11 +206,7 @@ class TestGrCNNMatcher(unittest.TestCase):
                     pool.join()
                     # Accumulate results
                     # results = [result.get() for result in results]
-                    for result in results:
-                        logger.debug('Result: ')
-                        logger.debug(result.get())
-                        logger.debug('*' * 50)
-
+                    results = [result.get() for result in results]
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                     hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                     for result in results:
