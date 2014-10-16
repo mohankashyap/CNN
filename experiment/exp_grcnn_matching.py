@@ -20,6 +20,7 @@ import traceback
 import random
 
 from threading import Thread
+from multiprocessing import Process, Pool, Queue
 from pprint import pprint
 
 sys.path.append('../source/')
@@ -40,6 +41,25 @@ logger = logging.getLogger(__name__)
 theano.config.openmp=True
 theano.config.on_unused_input='ignore'
 
+# Due to the constraint of Pool.apply_async, the parallel processing function must be
+# defined globally
+def parallel_process(lst_of_arrays, grcnn):
+    grads, costs, preds = [], 0.0, []
+    for (sentL, sentR), label in lst_of_arrays:
+        r = grcnn.compute_cost_and_gradient(sentL, sentR, [label])
+        grad, cost, pred = r[:-2], r[-2], r[-1]
+        if len(grads) == 0:
+            grads, costs, preds = grad, cost, pred
+        else:
+            for gt, g in zip(grads, grad):
+                gt += g
+            costs += cost
+            preds += pred
+    # Each element of results is a three-element tuple, where the first element
+    # accumulates the gradients, the second element accumulate the cost and the 
+    # third element store the predictions
+    return grads, costs, preds
+
 class TestGrCNNMatcher(unittest.TestCase):
     '''
     Test the performance of GrCNNMatcher model on matching task.
@@ -49,10 +69,10 @@ class TestGrCNNMatcher(unittest.TestCase):
         Load training and test data set, also, load word-embeddings.
         '''
         np.random.seed(42)
-        # matching_train_filename = '../data/pair_all_sentence_train.txt'
-        # matching_test_filename = '../data/pair_sentence_test.txt'
-        matching_train_filename = '../data/small_pair_train.txt'
-        matching_test_filename = '../data/small_pair_test.txt'
+        matching_train_filename = '../data/pair_all_sentence_train.txt'
+        matching_test_filename = '../data/pair_sentence_test.txt'
+        # matching_train_filename = '../data/small_pair_train.txt'
+        # matching_test_filename = '../data/small_pair_test.txt'
         train_pairs_txt, test_pairs_txt = [], []
         # Loading training and test pairs
         start_time = time.time()
@@ -136,6 +156,9 @@ class TestGrCNNMatcher(unittest.TestCase):
         test_index = [(i, i) for i in xrange(self.test_size)]
         test_index += [(np.random.randint(self.test_size), np.random.randint(self.test_size)) 
                         for _ in xrange(self.test_size * ratio)]
+        # Share variables
+        train_pairs_set = self.train_pairs_set
+        test_pairs_set = self.test_pairs_set
         # Random shuffle training and test index
         random.shuffle(train_index)
         random.shuffle(test_index)
@@ -155,41 +178,12 @@ class TestGrCNNMatcher(unittest.TestCase):
         # Build training and test labels
         train_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in train_index])
         test_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in test_index])
+        # Zip together
+        train_instances = zip(train_pairs_set, train_labels)
+        test_instances = zip(test_pairs_set, test_labels)
         try: 
-            # Multi-threading process for each batch
-            num_threads = 1
-            threads = [None] * num_threads
-            results = [None] * num_threads
-            # Local processing function for each thread
-            def thread_process(idx, start_idx, end_idx):
-                '''
-                @idx: Int. Store result in the idx th cell.
-                @start_idx: Int. Starting index of current processing, inclusive.
-                @end_idx: Int. Ending index of current processing, exclusive.
-                '''
-                grads, costs, preds = [], 0.0, []
-                for t in xrange(start_idx, end_idx):
-                    pidx, qidx = train_index[t][0], train_index[t][1]
-                    label = 1 if pidx == qidx else 0
-                    # logger.debug('Instance %d, sentence 1: %d, sentence 2: %d' % (t, 
-                        # self.train_pairs_set[pidx][0].shape[0], self.train_pairs_set[qidx][1].shape[0]))
-
-                    r = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
-                                                        self.train_pairs_set[qidx][1],
-                                                        [label])
-                    grad, cost, pred = r[:-2], r[-2], r[-1]
-                    if len(grads) == 0:
-                        grads, costs, preds = grad, cost, pred
-                    else:
-                        for gt, g in zip(grads, grad):
-                            gt += g
-                        costs += cost
-                        preds += pred
-                # Each element of results is a three-element tuple, where the first element
-                # accumulates the gradients, the second element accumulate the cost and the 
-                # third element store the predictions
-                results[idx] = (grads, costs, preds)
-
+            # Multi-processes for batch learning
+            num_processes = 4
             for i in xrange(configer.nepoch):
                 # Looper over training instances
                 total_cost = 0.0
@@ -201,15 +195,22 @@ class TestGrCNNMatcher(unittest.TestCase):
                 for j in xrange(num_batch):
                     if (j * batch_size) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j*batch_size, i))
                     start_idx = j * batch_size
-                    step = batch_size / num_threads
-                    for k in xrange(num_threads):
-                        threads[k] = Thread(target=thread_process, args=(k, start_idx, start_idx+step))
-                        threads[k].start()
+                    step = batch_size / num_processes
+                    # Creating Process Pool
+                    pool = Pool(num_processes)
+                    results = []
+                    for k in xrange(num_processes):
+                        results.append(pool.apply_async(parallel_process, args=(train_instances[start_idx: start_idx+step], grcnn)))
                         start_idx += step
-                    # Threads working
-                    for k in xrange(num_threads):
-                        threads[k].join()
+                    pool.close()
+                    pool.join()
                     # Accumulate results
+                    # results = [result.get() for result in results]
+                    for result in results:
+                        logger.debug('Result: ')
+                        logger.debug(result.get())
+                        logger.debug('*' * 50)
+
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                     hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                     for result in results:
@@ -230,7 +231,7 @@ class TestGrCNNMatcher(unittest.TestCase):
                     pidx, qidx = train_index[j][0], train_index[j][1]
                     label = 1 if pidx == qidx else 0
                     r = grcnn.compute_cost_and_gradient(self.train_pairs_set[pidx][0], 
-                                                        self.train_paris_set[qidx][1],
+                                                        self.train_pairs_set[qidx][1],
                                                         [label])
                     grad, cost, pred = r[:-2], r[-2], r[-1]
                     # Accumulate results
@@ -303,10 +304,6 @@ class TestGrCNNMatcher(unittest.TestCase):
             logger.debug('!!!Error!!!')
             logger.debug('-' * 60)
             traceback.print_exc(file=sys.stdout)
-            logger.debug('Current value of K = {}'.format(k))
-            logger.debug('First sentence: {}'.format(self.train_pairs_set[pidx][0].shape))
-            logger.debug('Second sentence: {}'.format(self.train_pairs_set[qidx][1].shape))
-            logger.debug('-' * 60)
         finally:            
             final_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
             sio.savemat('grcnn_matcher_final.mat', initial_params)
