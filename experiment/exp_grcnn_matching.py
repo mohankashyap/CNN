@@ -18,6 +18,7 @@ import cPickle
 import logging
 import traceback
 import random
+import argparse
 
 from threading import Thread
 from multiprocessing import Process, Pool, Queue
@@ -40,6 +41,11 @@ logger = logging.getLogger(__name__)
 
 theano.config.openmp=True
 theano.config.on_unused_input='ignore'
+
+parser = argparse.ArgumentParser()
+parser.add_argument('nkerns', help='Specify the number of cpu kernels to be used.', 
+                    type=int)
+args = parser.parse_args()
 
 np.random.seed(42)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
@@ -158,7 +164,7 @@ logger.debug('Time used to build zipping training and test instances: %f seconds
 try: 
     start_time = time.time()
     # Multi-processes for batch learning
-    num_processes = 10
+    num_processes = args.nkerns
     def parallel_process(start_idx, end_idx):
         grads, costs, preds = [], 0.0, []
         for (sentL, sentR), label in train_instances[start_idx: end_idx]:
