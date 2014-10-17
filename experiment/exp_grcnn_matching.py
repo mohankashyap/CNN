@@ -45,15 +45,15 @@ theano.config.openmp=True
 theano.config.on_unused_input='ignore'
 
 parser = argparse.ArgumentParser()
-parser.add_argument('nkerns', help='Specify the number of cpu kernels to be used.', 
-                    type=int)
+device_group = parser.add_mutually_exclusive_group()
+device_group.add_argument('-c', '--cpu', type=int, help='Specify the number of cpu kernels to be used.')
+device_group.add_argument('-g', '--gpu', action='store_true')
 parser.add_argument('-s', '--size', help='The size of each batch used to be trained.',
                     type=int, default=2000)
 parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
                     type=float, default=1.0)
 parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
-parser.add_argument('--gpu', action='store_true', default=False, help='Specify this to use GPU.')
 
 args = parser.parse_args()
 
@@ -174,7 +174,6 @@ logger.debug('Time used to build zipping training and test instances: %f seconds
 try: 
     start_time = time.time()
     # Multi-processes for batch learning
-    num_processes = args.nkerns
     def parallel_process(start_idx, end_idx):
         grads, costs, preds = [], 0.0, []
         for (sentL, sentR), label in train_instances[start_idx: end_idx]:
@@ -243,6 +242,7 @@ try:
                     grad /= fudge_factor + np.sqrt(hist_grad)
                 grcnn.update_params(total_grads, learn_rate)
         else:
+            num_processes = args.cpu
             # Using Parallel CPU computation
             # Parallel computing inside each batch
             for j in xrange(num_batch):
