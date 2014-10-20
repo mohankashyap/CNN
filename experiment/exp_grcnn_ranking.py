@@ -152,7 +152,7 @@ try:
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = train_pairs_set[j]
             nj = j
-            while nj == j: nj = random.randint(0, test_size)
+            while nj == j: nj = random.randint(0, test_size-1)
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             grad, cost, pred = r[:-2], r[-2], r[-1]
@@ -185,7 +185,7 @@ try:
                 if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
                 sentL, p_sentR = train_pairs_set[j]
                 nj = j
-                while nj == j: nj = random.randint(0, train_size)
+                while nj == j: nj = random.randint(0, train_size-1)
                 n_sentR = train_pairs_set[nj][1]
                 # Call GrCNNMatchRanker
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
@@ -243,7 +243,7 @@ try:
             for j in xrange(num_batch * batch_size, train_size):
                 sentL, p_sentR = train_pairs_set[j]
                 nj = j
-                while nj == j: nj = random.randint(0, train_size)
+                while nj == j: nj = random.randint(0, train_size-1)
                 n_sentR = train_pairs_set[j][1]
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                 grad, cost, pred = r[:-2], r[-2], r[-1]
@@ -270,7 +270,7 @@ try:
         for j in xrange(test_size):
             sentL, p_sentR = test_pairs_set[j]
             nj = j
-            while nj == j: nj = random.randint(0, test_size)
+            while nj == j: nj = random.randint(0, test_size-1)
             n_sentR = test_pairs_set[nj][1]
             plabel = grcnn.predict(sentL, p_sentR, sentL, n_sentR)[0]
             if plabel == 1: correct_count += 1
@@ -286,7 +286,7 @@ try:
     for j in xrange(test_size):
         sentL, p_sentR = test_pairs_set[j]
         nj = j
-        while nj == j: nj = random.randint(0, test_size)
+        while nj == j: nj = random.randint(0, test_size-1)
         n_sentR = test_pairs_set[nj][1]
         plabel = grcnn.predict(sentL, p_sentR, sentL, n_sentR)[0]
         if plabel == 1: correct_count += 1
