@@ -149,8 +149,12 @@ try:
     # Multi-processes for batch learning
     def parallel_process(start_idx, end_idx):
         grads, costs, preds = [], 0.0, []
-        for (sentL, sentR), label in train_instances[start_idx: end_idx]:
-            r = grcnn.compute_cost_and_gradient(sentL, sentR, [label])
+        for j in xrange(start_idx, end_idx):
+            sentL, p_sentR = train_pairs_set[j]
+            nj = j
+            while nj == j: nj = random.randint(0, test_size)
+            n_sentR = train_pairs_set[nj][1]
+            r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             grad, cost, pred = r[:-2], r[-2], r[-1]
             if len(grads) == 0:
                 grads, costs, preds = grad, cost, [pred[0]]
