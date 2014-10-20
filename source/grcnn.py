@@ -19,6 +19,7 @@ from utils import floatX
 from activations import Activation
 from mlp import HiddenLayer
 from logistic import SoftmaxLayer, LogisticLayer
+from score import ScoreLayer
 
 logger = logging.getLogger(__name__)
 
@@ -367,4 +368,63 @@ class GrCNNMatcher(object):
         with file(fname, 'rb') as fin:
             model = cPickle.load(fin)
             return model
+
+# Derive from GrCNNMatcher and only change the output of the last layer
+class GrCNNMatchScorer(GrCNNMatcher):
+    '''
+    Gated Recursive Convolutional Neural Network for matching task. The last 
+    layer of the model includes a linear layer for regression.
+    '''
+    def __init__(self, config=None, verbose=True):
+        # Call initialization in parent method to build architecture
+        super(GrCNNMatchScorer, self).__init__(config, verbose)
+        # Override, use concatenated vector as input to the score layer
+        self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp) 
+        self.output = self.score_layer.output
+        # Revise the parameters of this model
+        self.params = self.params[:-2]
+        self.params += self.score_layer.params
+    
+class GrCNNMatchRanker(object):
+    '''
+    Use two GrCNNMatchScorer to score the positive and negative pairs.
+    '''
+    def __init__(self, config=None, verbose=True):
+        # Build two components for scoring pairs of sentences
+        self.p_scorer = GrCNNMatchScorer(config, verbose)
+        self.n_scorer = GrCNNMatchScorer(config, verbose)
+        # Stack parameters
+        self.params = []
+        self.params += self.p_scorer.params
+        self.params += self.n_scorer.params
+        # Compute the total number of parameters in the model
+        self.num_params = self.p_scorer.num_params + self.n_scorer.num_params
+        # Build prediction function 
+        self.pred = self.p_scorer.output >= self.n_scorer.output
+        # Build target function 
+        self.cost = T.mean(T.maximum(0, 1.0 - self.p_score + self.n_score))
+        # Construct gradients of the target function with respect to the model parameters
+        self.gradparams = T.grad(self.cost, self.params)
+        # Build actual functions
+        self.objective = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
+                                                 self.n_scorer.inputL, self.n_scorer.inputR],
+                                         outputs=self.cost)
+        self.predict = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
+                                               self.n_scorer.inputL, self.n_scorer.inputR],
+                                       outputs=self.pred)
+        # Compute the gradient of the objective function with respect to the model parameters
+        self.compute_cost_and_gradient = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
+                                                                 self.n_scorer.inputL, self.n_scorer.inputR],
+                                                         outputs=self.gradparams+[self.cost, self.pred])
+        if verbose:
+            logger.debug('Architecture of GrCNNMatchRanker built finished, summarized below: ')
+            logger.debug('Input dimension: %d' % config.num_input)
+            logger.debug('Hidden dimension inside GrCNNMatcherRanker pyramid: %d' % config.num_hidden)
+            logger.debug('Hidden dimension MLP: %d' % config.num_mlp)
+            logger.debug('There are 4 GrCNN Encoders used in model.')
+            logger.debug('There are 2 MLP Hidden layers used in model.')
+            logger.debug('There is 2 Linear score layers used in model.')
+            logger.debug('There is 1 output unit used in model.')
+            logger.debug('Total number of parameters used in model: %d' % self.num_params)
+
 

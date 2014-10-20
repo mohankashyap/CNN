@@ -34,7 +34,7 @@ from utils import floatX
 from config import GrCNNConfiger
 
 charas = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-default_name = ''.join([charas[random.randint(0, len(charas))] for _ in xrange(5)])
+default_name = ''.join([charas[random.randint(0, len(charas)-1)] for _ in xrange(5)])
 # Set the basic configuration of the logging system
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -49,7 +49,7 @@ device_group = parser.add_mutually_exclusive_group()
 device_group.add_argument('-c', '--cpu', type=int, help='Specify the number of cpu kernels to be used.')
 device_group.add_argument('-g', '--gpu', action='store_true')
 parser.add_argument('-s', '--size', help='The size of each batch used to be trained.',
-                    type=int, default=2000)
+                    type=int, default=200)
 parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
                     type=float, default=1.0)
 parser.add_argument('-n', '--name', help='Name used to save the model.',
@@ -201,46 +201,29 @@ try:
         logger.debug('Batch size = %d' % batch_size)
         logger.debug('Total number of batches: %d' % num_batch)
         if args.gpu:
+            total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             # Using GPU computation
-            for j in xrange(num_batch):
-                if (j * batch_size) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j*batch_size, i))
+            for j in xrange(len(train_instances)):
+                if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
                 (sentL, sentR), label = train_instances[j]
                 r = grcnn.compute_cost_and_gradient(sentL, sentR, [label]) 
                 grad, cost, pred = r[:-2], r[-2], r[-1]
                 # Accumulate results
-                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 for gt, g in zip(total_grads, grad):
                     gt += g
                 for gt, g in zip(hist_grads, grad):
                     gt += np.square(g)
                 total_cost += cost
                 total_predictions.append(pred[0])
-                # AdaGrad updating
-                for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= len(train_index) - num_batch*batch_size
-                    grad /= fudge_factor + np.sqrt(hist_grad)
-                grcnn.update_params(total_grads, learn_rate)
-
-            # Update all the rests
-            for j in xrange(num_batch * batch_size, len(train_instances)):
-                (sentL, sentR), label = train_instances[j]
-                r = grcnn.compute_cost_and_gradient(sentL, sentR, [label]) 
-                grad, cost, pred = r[:-2], r[-2], r[-1]
-                # Accumulate results
-                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                for gt, g in zip(total_grads, grad):
-                    gt += g
-                for gt, g in zip(hist_grads, grad):
-                    gt += np.square(g)
-                total_cost += cost
-                total_predictions.append(pred[0])
-                # AdaGrad updating
-                for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= len(train_index) - num_batch*batch_size
-                    grad /= fudge_factor + np.sqrt(hist_grad)
-                grcnn.update_params(total_grads, learn_rate)
+                if (j+1) % batch_size == 0 or j == len(train_instances)-1:
+                    # AdaGrad updating
+                    for grad, hist_grad in zip(total_grads, hist_grads):
+                        grad /= batch_size
+                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    grcnn.update_params(total_grads, learn_rate)
+                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
         else:
             num_processes = args.cpu
             # Using Parallel CPU computation
@@ -324,9 +307,10 @@ try:
 except:
     logger.debug('!!!Error!!!')
     logger.debug('-' * 60)
-    if pool != None:
+    if args.cpu and pool != None:
         logger.debug('Quiting all subprocesses...')
         pool.terminate()
     traceback.print_exc(file=sys.stdout)
 finally:            
+    logger.debug('Saving the model: GrCNNMatcher-{}.pkl.'.format(args.name))
     GrCNNMatcher.save('GrCNNMatcher-{}.pkl'.format(args.name), grcnn)
