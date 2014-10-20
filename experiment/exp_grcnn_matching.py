@@ -272,11 +272,11 @@ try:
                     gt += np.square(g)
                 total_cost += cost
                 total_predictions.append(pred[0])
-                # AdaGrad updating
-                for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= len(train_index) - num_batch*batch_size
-                    grad /= fudge_factor + np.sqrt(hist_grad)
-                grcnn.update_params(total_grads, learn_rate)
+            # AdaGrad updating
+            for grad, hist_grad in zip(total_grads, hist_grads):
+                grad /= len(train_index) - num_batch*batch_size
+                grad /= fudge_factor + np.sqrt(hist_grad)
+            grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)
         train_labels = np.asarray(train_labels)

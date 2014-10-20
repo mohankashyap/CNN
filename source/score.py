@@ -24,7 +24,7 @@ class ScoreLayer(object):
         @num_in: Int. Size of the input dimension.
         '''
         self.input = input
-        self.W = thenao.shared(value=np.asarray(
+        self.W = theano.shared(value=np.asarray(
                     np.random.uniform(low=-np.sqrt(6.0/(num_in+1)),
                                       high=np.sqrt(6.0/(num_in+1)),
                                       size=(num_in)), dtype=floatX),

@@ -393,6 +393,9 @@ class GrCNNMatchRanker(object):
         # Build two components for scoring pairs of sentences
         self.p_scorer = GrCNNMatchScorer(config, verbose)
         self.n_scorer = GrCNNMatchScorer(config, verbose)
+        # Extract scores
+        self.p_score = self.p_scorer.output
+        self.n_score = self.n_scorer.output
         # Stack parameters
         self.params = []
         self.params += self.p_scorer.params
