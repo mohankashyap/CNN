@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-# matching_train_filename = '../data/pair_all_sentence_train.txt'
-# matching_test_filename = '../data/pair_sentence_test.txt'
-matching_train_filename = '../data/small_pair_train.txt'
-matching_test_filename = '../data/small_pair_test.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
+# matching_train_filename = '../data/small_pair_train.txt'
+# matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -155,6 +155,7 @@ try:
             while nj == j: nj = random.randint(0, test_size-1)
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
+            # p_score, n_score = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             grad, cost, pred = r[:-2], r[-2], r[-1]
             if len(grads) == 0:
                 grads, costs, preds = grad, cost, [pred[0]]
@@ -163,9 +164,10 @@ try:
                     gt += g
                 costs += cost
                 preds.append(pred[0])
-
-            logger.debug('Current costs: {}'.format(costs))
-            logger.debug('Current preds: {}'.format(preds))
+            # logger.debug('-' * 50)
+            # logger.debug('p-score = {}, n-score = {}'.format(p_score, n_score))
+            # logger.debug('cost = {}'.format(cost))
+            # logger.debug('prediction = {}'.format(pred))
         # Each element of results is a three-element tuple, where the first element
         # accumulates the gradients, the second element accumulate the cost and the 
         # third element store the predictions
@@ -267,9 +269,9 @@ try:
         # Compute training error
         total_predictions = np.asarray(total_predictions)
         total_count = np.sum(total_predictions)
-
-        logger.debug('Total cost = %d' % total_count)
-        logger.debug('Total prediction = {}'.format(total_predictions))
+        # logger.debug('-' * 50)
+        # logger.debug('Total cost = %d' % total_count)
+        # logger.debug('Total prediction = {}'.format(total_predictions))
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(train_size)))
         correct_count = 0

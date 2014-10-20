@@ -419,6 +419,10 @@ class GrCNNMatchRanker(object):
         self.compute_cost_and_gradient = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
                                                                  self.n_scorer.inputL, self.n_scorer.inputR],
                                                          outputs=self.gradparams+[self.cost, self.pred])
+        # For debugging purpose only
+        self.show_scores = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
+                                                   self.n_scorer.inputL, self.n_scorer.inputR], 
+                                           outputs=[self.p_score, self.n_score])
         if verbose:
             logger.debug('Architecture of GrCNNMatchRanker built finished, summarized below: ')
             logger.debug('Input dimension: %d' % config.num_input)
