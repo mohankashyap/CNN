@@ -41,3 +41,9 @@ class ScoreLayer(object):
 
     def L2_loss(self):
         return T.sum(self.W ** 2)
+
+    def encode(self, inputM):
+        '''
+        @inputM: Theano symbolic tensor
+        '''
+        return T.dot(inputM, self.W) + self.b

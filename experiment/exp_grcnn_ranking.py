@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
-# matching_train_filename = '../data/small_pair_train.txt'
-# matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/small_pair_train.txt'
+matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -156,14 +156,14 @@ try:
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             # p_score, n_score = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-            grad, cost, pred = r[:-2], r[-2], r[-1]
+            grad, cost, (score_p, score_n) = r[:-2], r[-2], r[-1]
             if len(grads) == 0:
-                grads, costs, preds = grad, cost, [pred[0]]
+                grads, costs, preds = grad, cost, [score_p >= score_n]
             else:
                 for gt, g in zip(grads, grad):
                     gt += g
                 costs += cost
-                preds.append(pred[0])
+                preds.append(score_p >= score_n)
             # logger.debug('-' * 50)
             # logger.debug('p-score = {}, n-score = {}'.format(p_score, n_score))
             # logger.debug('cost = {}'.format(cost))
@@ -194,14 +194,14 @@ try:
                 n_sentR = train_pairs_set[nj][1]
                 # Call GrCNNMatchRanker
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                grad, cost, pred = r[:-2], r[-2], r[-1]
+                grad, cost, (score_p, score_n) = r[:-2], r[-2], r[-1]
                 # Accumulate results
                 for gt, g in zip(total_grads, grad):
                     gt += g
                 for gt, g in zip(hist_grads, grad):
                     gt += np.square(g)
                 total_cost += cost
-                total_predictions.append(pred[0])
+                total_predictions.append(score_p >= score_n)
                 if (j+1) % batch_size == 0 or j == len(train_instances)-1:
                     # AdaGrad updating
                     for grad, hist_grad in zip(total_grads, hist_grads):
@@ -251,7 +251,7 @@ try:
                 while nj == j: nj = random.randint(0, train_size-1)
                 n_sentR = train_pairs_set[j][1]
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                grad, cost, pred = r[:-2], r[-2], r[-1]
+                grad, cost, (score_p, score_n) = r[:-2], r[-2], r[-1]
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -260,7 +260,7 @@ try:
                 for gt, g in zip(hist_grads, grad):
                     gt += np.square(g)
                 total_cost += cost
-                total_predictions.append(pred[0])
+                total_predictions.append(score_p >= score_n)
                 # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
                 grad /= train_size - num_batch*batch_size
@@ -280,8 +280,8 @@ try:
             nj = j
             while nj == j: nj = random.randint(0, test_size-1)
             n_sentR = test_pairs_set[nj][1]
-            plabel = grcnn.predict(sentL, p_sentR, sentL, n_sentR)[0]
-            if plabel == 1: correct_count += 1
+            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            if score_p >= score_n: correct_count += 1
         logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
         # Save the model
         logger.debug('Save current model...')

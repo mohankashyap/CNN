@@ -156,6 +156,20 @@ class GrCNNEncoder(object):
                      central_gate * central_current_level
         return next_level
 
+    def encode(self, inputM):
+        '''
+        @input: Theano symbol matrix. Compress the input matrix into output vector.
+        '''
+        hidden = T.dot(inputM, self.U)
+        # Length of the time sequence
+        nsteps = inputM.shape[0]
+        pyramids, _ = theano.scan(fn=self._step_prop, 
+                                    sequences=T.arange(nsteps-1),
+                                    outputs_info=[hidden],
+                                    n_steps=nsteps-1)
+        output = pyramids[-1][0].dimshuffle('x', 0)
+        return output
+
 
 class GrCNN(object):
     '''
@@ -370,69 +384,97 @@ class GrCNNMatcher(object):
         return model
 
 # Derive from GrCNNMatcher and only change the output of the last layer
-class GrCNNMatchScorer(GrCNNMatcher):
+class GrCNNMatchScorer(object):
     '''
     Gated Recursive Convolutional Neural Network for matching task. The last 
     layer of the model includes a linear layer for regression.
     '''
     def __init__(self, config=None, verbose=True):
-        # Call initialization in parent method to build architecture
-        super(GrCNNMatchScorer, self).__init__(config, verbose)
-        # Override, use concatenated vector as input to the score layer
-        self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp) 
-        self.output = self.score_layer.output
-        # Revise the parameters of this model
-        self.params = self.params[:-2]
-        self.params += self.score_layer.params
-    
-class GrCNNMatchRanker(object):
-    '''
-    Use two GrCNNMatchScorer to score the positive and negative pairs.
-    '''
-    def __init__(self, config=None, verbose=True):
-        # Build two components for scoring pairs of sentences
-        self.p_scorer = GrCNNMatchScorer(config, verbose)
-        self.n_scorer = GrCNNMatchScorer(config, verbose)
-        # Extract scores
-        self.p_score = self.p_scorer.output
-        self.n_score = self.n_scorer.output
-        # Stack parameters
+        # Construct two GrCNNEncoders for matching two sentences
+        self.encoderL = GrCNNEncoder(config, verbose)
+        self.encoderR = GrCNNEncoder(config, verbose)
+        # Link the parameters of two parts
         self.params = []
-        self.params += self.p_scorer.params
-        self.params += self.n_scorer.params
-        # Compute the total number of parameters in the model
-        self.num_params = self.p_scorer.num_params + self.n_scorer.num_params
-        # Build prediction function 
-        self.pred = self.p_scorer.output >= self.n_scorer.output
-        # Build target function 
-        self.cost = T.mean(T.maximum(0, 1.0 - self.p_score + self.n_score))
-        # Construct gradients of the target function with respect to the model parameters
+        self.params += self.encoderL.params
+        self.params += self.encoderR.params
+        # Build three kinds of inputs:
+        # 1, inputL, inputR. This pair is used for computing the score after training
+        # 2, inputPL, inputPR. This part is used for training positive pairs
+        # 3, inputNL, inputNR. This part is used for training negative pairs
+        self.inputL = T.matrix(name='inputL', dtype=floatX)
+        self.inputR = T.matrix(name='inputR', dtype=floatX)
+        # Positive
+        self.inputPL = T.matrix(name='inputPL', dtype=floatX)
+        self.inputPR = T.matrix(name='inputPR', dtype=floatX)
+        # Negative
+        self.inputNL = T.matrix(name='inputNL', dtype=floatX)
+        self.inputNR = T.matrix(name='inputNR', dtype=floatX)
+        # Linking input-output mapping
+        self.hiddenL = self.encoderL.encode(self.inputL)
+        self.hiddenR = self.encoderR.encode(self.inputR)
+        # Positive 
+        self.hiddenPL = self.encoderL.encode(self.inputPL)
+        self.hiddenPR = self.encoderR.encode(self.inputPR)
+        # Negative
+        self.hiddenNL = self.encoderL.encode(self.inputNL)
+        self.hiddenNR = self.encoderR.encode(self.inputNR)
+        # Activation function
+        self.act = Activation(config.activation)
+        # MLP Component
+        self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=1)
+        self.hiddenP = T.concatenate([self.hiddenPL, self.hiddenPR], axis=1)
+        self.hiddenN = T.concatenate([self.hiddenNL, self.hiddenNR], axis=1)
+        # Build hidden layer
+        self.hidden_layer = HiddenLayer(self.hidden, (2*config.num_hidden, config.num_mlp), act=Activation(config.hiddenact))
+        self.compressed_hidden = self.hidden_layer.output
+        self.compressed_hiddenP = self.hidden_layer.encode(self.hiddenP)
+        self.compressed_hiddenN = self.hidden_layer.encode(self.hiddenN)
+        # Accumulate parameters
+        self.params += self.hidden_layer.params
+        # Dropout parameter
+        srng = T.shared_randomstreams.RandomStreams(config.random_seed)
+        mask = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hidden.shape)
+        maskP = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hiddenP.shape)
+        maskN = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hiddenN.shape)
+        self.compressed_hidden *= T.cast(mask, floatX)
+        self.compressed_hiddenP *= T.cast(maskP, floatX)
+        self.compressed_hiddenN *= T.cast(maskN, floatX)
+        # Score layers
+        self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp)
+        self.output = self.score_layer.output
+        self.scoreP = self.score_layer.encode(self.compressed_hiddenP)
+        self.scoreN = self.score_layer.encode(self.compressed_hiddenN)
+        # Accumulate parameters
+        self.params += self.score_layer.params
+        # Build cost function
+        self.cost = T.mean(T.maximum(0, 1.0 - self.scoreP + self.scoreN))
+        # Construct the gradient of the cost function with respect to the model parameters
         self.gradparams = T.grad(self.cost, self.params)
-        # Build actual functions
-        self.objective = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
-                                                 self.n_scorer.inputL, self.n_scorer.inputR],
-                                         outputs=self.cost)
-        self.predict = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
-                                               self.n_scorer.inputL, self.n_scorer.inputR],
-                                       outputs=self.pred)
-        # Compute the gradient of the objective function with respect to the model parameters
-        self.compute_cost_and_gradient = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
-                                                                 self.n_scorer.inputL, self.n_scorer.inputR],
-                                                         outputs=self.gradparams+[self.cost, self.pred])
-        # For debugging purpose only
-        self.show_scores = theano.function(inputs=[self.p_scorer.inputL, self.p_scorer.inputR, 
-                                                   self.n_scorer.inputL, self.n_scorer.inputR], 
-                                           outputs=[self.p_score, self.n_score])
+        # Compute the total number of parameters in the model
+        self.num_params_encoder = config.num_input * config.num_hidden + \
+                          config.num_hidden * config.num_hidden * 2 + \
+                          config.num_hidden + \
+                          config.num_hidden * 3 * 2 + \
+                          3
+        self.num_params_encoder *= 2
+        self.num_params_classifier = 2 * config.num_hidden * config.num_mlp + \
+                                     config.num_mlp + \
+                                     config.num_mlp + 1
+        self.num_params = self.num_params_encoder + self.num_params_classifier
+        # Build class methods
+        self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
+        self.compute_cost_and_gradient = theano.function(inputs=[self.inputPL, self.inputPR, 
+                                                                 self.inputNL, self.inputNR],
+                                                         outputs=self.gradparams+[self.cost]+[(self.scoreP, self.scoreN)])
+        self.show_scores = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR], 
+                                           outputs=[self.scoreP, self.scoreN])
         if verbose:
-            logger.debug('Architecture of GrCNNMatchRanker built finished, summarized below: ')
+            logger.debug('Architecture of GrCNNMatchScorer built finished, summarized below: ')
             logger.debug('Input dimension: %d' % config.num_input)
-            logger.debug('Hidden dimension inside GrCNNMatcherRanker pyramid: %d' % config.num_hidden)
+            logger.debug('Hidden dimension inside GrCNNMatchScorer pyramid: %d' % config.num_hidden)
             logger.debug('Hidden dimension MLP: %d' % config.num_mlp)
-            logger.debug('There are 4 GrCNN Encoders used in model.')
-            logger.debug('There are 2 MLP Hidden layers used in model.')
-            logger.debug('There is 2 Linear score layers used in model.')
-            logger.debug('There is 1 output unit used in model.')
-            logger.debug('Total number of parameters used in model: %d' % self.num_params)
+            logger.debug('There are 2 GrCNNEncoders used in model.')
+            logger.debug('Total number of parameters used in the model: %d' % self.num_params)
 
     def update_params(self, grads, learn_rate):
         '''
@@ -441,13 +483,13 @@ class GrCNNMatchRanker(object):
         '''
         for param, grad in zip(self.params, grads):
             p = param.get_value(borrow=True)
-            param.set_value(p - learn_rate * grad, borrow=True)
+            param.set_value(p - learn_rate * p, borrow=True)
 
     @staticmethod
     def save(fname, model):
         '''
         @fname: String. Filename to store the model.
-        @model: GrCNNMatchRanker. An instance of GrCNNMatchRanker to be saved.
+        @model: GrCNNMatchScorer. An instance of GrCNNMatchScorer to be saved.
         '''
         with file(fname, 'wb') as fout:
             cPickle.dump(model, fout)

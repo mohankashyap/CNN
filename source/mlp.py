@@ -30,6 +30,7 @@ class HiddenLayer(object):
 		@act: Activation. Activation function used at each neuron.
 		'''
 		self.input = input
+		self.act = act
 		fan_in = num_in
 		fan_out = num_out
 		self.W = theano.shared(value=np.asarray(
@@ -38,12 +39,18 @@ class HiddenLayer(object):
 									  size=(num_in, num_out)), dtype=floatX),
 					name='W_hidden', borrow=True)
 		self.b = theano.shared(value=np.zeros(num_out, dtype=floatX), name='b_hidden', borrow=True)
-		self.output = act.activate(T.dot(self.input, self.W) + self.b)
+		self.output = self.act.activate(T.dot(self.input, self.W) + self.b)
 		# Stack parameters
 		self.params = [self.W, self.b]
 
 	def L2_loss(self):
 		return T.sum(self.W ** 2)
+
+	def encode(self, inputM):
+		'''
+		@inputM: Theano.tensor symbol.
+		'''
+		return self.act.activate(T.dot(inputM, self.W) + self.b)
 
 
 class MLP(object):
