@@ -89,7 +89,7 @@ class TestGRCNN(unittest.TestCase):
         input_symbol = T.matrix()
         output_symbol = grcnn._step_prop_reduce(input_symbol)
         f = theano.function(inputs=[input_symbol], outputs=output_symbol)
-        time_steps = 600
+        time_steps = 200
         input_matrix = np.random.rand(time_steps, self.configer.num_input)
         input_matrix = input_matrix.astype(np.float32)
         # Timing for numpy iterative application

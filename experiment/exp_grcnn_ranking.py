@@ -26,7 +26,7 @@ from pprint import pprint
 sys.path.append('../source/')
 
 from rnn import BRNN, TBRNN, RNN
-from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchRanker
+from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchScorer
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer, LogisticLayer
 from utils import floatX
@@ -128,7 +128,7 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './grCNN_ranker.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
-grcnn = GrCNNMatchRanker(configer, verbose=True)
+grcnn = GrCNNMatchScorer(configer, verbose=True)
 end_time = time.time()
 logger.debug('Time used to build GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
@@ -155,8 +155,10 @@ try:
             while nj == j: nj = random.randint(0, test_size-1)
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
+
+            hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
             # p_score, n_score = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-            grad, cost, (score_p, score_n) = r[:-2], r[-2], r[-1]
+            grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             if len(grads) == 0:
                 grads, costs, preds = grad, cost, [score_p >= score_n]
             else:
@@ -165,7 +167,10 @@ try:
                 costs += cost
                 preds.append(score_p >= score_n)
             # logger.debug('-' * 50)
-            # logger.debug('p-score = {}, n-score = {}'.format(p_score, n_score))
+            logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
+            logger.debug('HiddenL: {}'.format(hiddenL))
+            logger.debug('HiddenR: {}'.format(hiddenR))
+            logger.debug('-' * 50)
             # logger.debug('cost = {}'.format(cost))
             # logger.debug('prediction = {}'.format(pred))
         # Each element of results is a three-element tuple, where the first element
@@ -194,7 +199,7 @@ try:
                 n_sentR = train_pairs_set[nj][1]
                 # Call GrCNNMatchRanker
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                grad, cost, (score_p, score_n) = r[:-2], r[-2], r[-1]
+                grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
                 # Accumulate results
                 for gt, g in zip(total_grads, grad):
                     gt += g
@@ -251,7 +256,8 @@ try:
                 while nj == j: nj = random.randint(0, train_size-1)
                 n_sentR = train_pairs_set[j][1]
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                grad, cost, (score_p, score_n) = r[:-2], r[-2], r[-1]
+                hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
+                grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -261,6 +267,10 @@ try:
                     gt += np.square(g)
                 total_cost += cost
                 total_predictions.append(score_p >= score_n)
+                logger.debug('-' * 50)
+                logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
+                logger.debug('HiddenL: {}'.format(hiddenL))
+                logger.debug('HiddenR: {}'.format(hiddenR))
                 # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
                 grad /= train_size - num_batch*batch_size
@@ -270,8 +280,8 @@ try:
         total_predictions = np.asarray(total_predictions)
         total_count = np.sum(total_predictions)
         # logger.debug('-' * 50)
-        # logger.debug('Total cost = %d' % total_count)
-        # logger.debug('Total prediction = {}'.format(total_predictions))
+        logger.debug('Total cost = %d' % total_count)
+        logger.debug('Total prediction = {}'.format(total_predictions))
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(train_size)))
         correct_count = 0
@@ -281,10 +291,13 @@ try:
             while nj == j: nj = random.randint(0, test_size-1)
             n_sentR = test_pairs_set[nj][1]
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = score_p[0], score_n[0]
             if score_p >= score_n: correct_count += 1
         logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
         # Save the model
         logger.debug('Save current model...')
+        params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+        sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
         GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
@@ -296,8 +309,9 @@ try:
         nj = j
         while nj == j: nj = random.randint(0, test_size-1)
         n_sentR = test_pairs_set[nj][1]
-        plabel = grcnn.predict(sentL, p_sentR, sentL, n_sentR)[0]
-        if plabel == 1: correct_count += 1
+        score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+        score_p, score_n = score_p[0], score_n[0]
+        if score_p >= score_n: correct_count += 1
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
@@ -309,5 +323,13 @@ except:
         pool.terminate()
     traceback.print_exc(file=sys.stdout)
 finally:            
+    logger.debug('Saving model parameters...')
+    params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+    sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
     GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
+
+
+
+
+

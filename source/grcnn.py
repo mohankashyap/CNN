@@ -33,7 +33,7 @@ class GrCNNEncoder(object):
         ''' 
         if verbose: logger.debug('Building Gated Recursive Convolutional Neural Network Encoder...')
         # Make theano symbolic tensor for input and model parameters
-        self.input = T.matrix(name='input', dtype=floatX)
+        self.input = T.matrix(name='GrCNN Encoder input', dtype=floatX)
         # Configure activation function
         self.act = Activation(config.activation)
         fan_in, fan_out = config.num_input, config.num_hidden
@@ -77,6 +77,7 @@ class GrCNNEncoder(object):
         self.nsteps = self.input.shape[0]
         self.pyramids, _ = theano.scan(fn=self._step_prop, 
                                     sequences=T.arange(self.nsteps-1),
+                                    non_sequences=self.nsteps,
                                     outputs_info=[self.hidden0],
                                     n_steps=self.nsteps-1)
         self.output = self.pyramids[-1][0].dimshuffle('x', 0)
@@ -88,15 +89,15 @@ class GrCNNEncoder(object):
             logger.debug('Size of the hidden dimension: %d' % fan_out)
             logger.debug('Activation function: %s' % config.activation)
 
-    def _step_prop(self, iter, current_level):
+    def _step_prop(self, iter, current_level, nsteps):
         '''
         @current_level: Input matrix at current level. The first dimension corresponds to 
         the timestamp while the second dimension corresponds to the dimension of hidden representation
         '''
         # Build shifted matrix, due to the constraints of Theano.scan, we have to keep the shape of the
         # input and output matrix
-        left_current_level = current_level[:self.nsteps-iter-1]
-        right_current_level = current_level[1:self.nsteps-iter]
+        left_current_level = current_level[:nsteps-iter-1]
+        right_current_level = current_level[1:nsteps-iter]
         # Compute temporary central hidden representation, of size Txd, but we only care about the first
         # T-1 rows, i.e., we only focus on the (T-1)xd sub-matrix.
         central_current_level = self.act.activate(T.dot(left_current_level, self.Wl) + 
@@ -118,7 +119,7 @@ class GrCNNEncoder(object):
         next_level = left_gate * left_current_level + \
                      right_gate * right_current_level + \
                      central_gate * central_current_level
-        return T.set_subtensor(current_level[:self.nsteps-iter-1], next_level)
+        return T.set_subtensor(current_level[:nsteps-iter-1], next_level)
 
     def _step_prop_reduce(self, current_level):
         '''
@@ -165,6 +166,7 @@ class GrCNNEncoder(object):
         nsteps = inputM.shape[0]
         pyramids, _ = theano.scan(fn=self._step_prop, 
                                     sequences=T.arange(nsteps-1),
+                                    non_sequences=nsteps,
                                     outputs_info=[hidden],
                                     n_steps=nsteps-1)
         output = pyramids[-1][0].dimshuffle('x', 0)
@@ -401,8 +403,8 @@ class GrCNNMatchScorer(object):
         # 1, inputL, inputR. This pair is used for computing the score after training
         # 2, inputPL, inputPR. This part is used for training positive pairs
         # 3, inputNL, inputNR. This part is used for training negative pairs
-        self.inputL = T.matrix(name='inputL', dtype=floatX)
-        self.inputR = T.matrix(name='inputR', dtype=floatX)
+        self.inputL = self.encoderL.input
+        self.inputR = self.encoderR.input
         # Positive
         self.inputPL = T.matrix(name='inputPL', dtype=floatX)
         self.inputPR = T.matrix(name='inputPR', dtype=floatX)
@@ -410,8 +412,8 @@ class GrCNNMatchScorer(object):
         self.inputNL = T.matrix(name='inputNL', dtype=floatX)
         self.inputNR = T.matrix(name='inputNR', dtype=floatX)
         # Linking input-output mapping
-        self.hiddenL = self.encoderL.encode(self.inputL)
-        self.hiddenR = self.encoderR.encode(self.inputR)
+        self.hiddenL = self.encoderL.output
+        self.hiddenR = self.encoderR.output
         # Positive 
         self.hiddenPL = self.encoderL.encode(self.inputPL)
         self.hiddenPR = self.encoderR.encode(self.inputPR)
@@ -465,9 +467,11 @@ class GrCNNMatchScorer(object):
         self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
         self.compute_cost_and_gradient = theano.function(inputs=[self.inputPL, self.inputPR, 
                                                                  self.inputNL, self.inputNR],
-                                                         outputs=self.gradparams+[self.cost]+[(self.scoreP, self.scoreN)])
+                                                         outputs=self.gradparams+[self.cost, self.scoreP, self.scoreN])
         self.show_scores = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR], 
                                            outputs=[self.scoreP, self.scoreN])
+        self.show_hiddens = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
+                                            outputs=[self.hiddenP, self.hiddenN])
         if verbose:
             logger.debug('Architecture of GrCNNMatchScorer built finished, summarized below: ')
             logger.debug('Input dimension: %d' % config.num_input)
