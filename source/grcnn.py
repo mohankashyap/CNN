@@ -261,7 +261,7 @@ class GrCNN(object):
         '''
         with file(fname, 'rb') as fin:
             model = cPickle.load(fin)
-            return model
+        return model
 
 
 class GrCNNMatcher(object):
@@ -367,7 +367,7 @@ class GrCNNMatcher(object):
         '''
         with file(fname, 'rb') as fin:
             model = cPickle.load(fin)
-            return model
+        return model
 
 # Derive from GrCNNMatcher and only change the output of the last layer
 class GrCNNMatchScorer(GrCNNMatcher):
@@ -427,4 +427,30 @@ class GrCNNMatchRanker(object):
             logger.debug('There is 1 output unit used in model.')
             logger.debug('Total number of parameters used in model: %d' % self.num_params)
 
+    def update_params(self, grads, learn_rate):
+        '''
+        @grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
+        @learn_rate: scalar. Learning rate.
+        '''
+        for param, grad in zip(self.params, grads):
+            p = param.get_value(borrow=True)
+            param.set_value(p - learn_rate * grad, borrow=True)
+
+    @staticmethod
+    def save(fname, model):
+        '''
+        @fname: String. Filename to store the model.
+        @model: GrCNNMatchRanker. An instance of GrCNNMatchRanker to be saved.
+        '''
+        with file(fname, 'wb') as fout:
+            cPickle.dump(model, fout)
+
+    @staticmethod
+    def load(fname):
+        '''
+        @fname: String. Filename to load the model.
+        '''
+        with file(fname, 'rb') as fin:
+            model = cPickle.load(fin)
+        return model
 
