@@ -4,7 +4,6 @@
 # @Author  : Han Zhao (han.zhao@uwaterloo.ca)
 # @Link    : https://github.com/KeiraZhao
 # @Version : $Id$
-
 import os, sys
 import numpy as np
 import theano
@@ -27,7 +26,7 @@ from pprint import pprint
 sys.path.append('../source/')
 
 from rnn import BRNN, TBRNN, RNN
-from grcnn import GrCNN, GrCNNMatcher
+from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchRanker
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer, LogisticLayer
 from utils import floatX
@@ -58,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
-# matching_train_filename = '../data/small_pair_train.txt'
-# matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/small_pair_train.txt'
+matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -126,51 +125,25 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
-config_filename = './grCNN.conf'
+config_filename = './grCNN_ranker.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
-grcnn = GrCNNMatcher(configer, verbose=True)
+grcnn = GrCNNMatchRanker(configer, verbose=True)
 end_time = time.time()
-logger.debug('Time used to build GrCNN: %f seconds.' % (end_time-start_time))
+logger.debug('Time used to build GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
-ratio = 1
-logger.debug('Number of positive training pairs: %d' % train_size)
-logger.debug('Number of negative training pairs: %d' % train_size * ratio)
-# Build training and test index samples
-train_index = [(i, i) for i in xrange(train_size)]
-train_index += [(np.random.randint(train_size), np.random.randint(train_size)) 
-                for _ in xrange(train_size * ratio)]
-test_index = [(i, i) for i in xrange(test_size)]
-test_index += [(np.random.randint(test_size), np.random.randint(test_size)) 
-                for _ in xrange(test_size * ratio)]
-# Random shuffle training and test index
-random.shuffle(train_index)
-random.shuffle(test_index)
 # Begin training
 # Using AdaGrad learning algorithm
 learn_rate = args.rate
 batch_size = args.size
 fudge_factor = 1e-6
-logger.debug('GrCNNMatcher.params: {}'.format(grcnn.params))
+logger.debug('GrCNNMatchRanker.params: {}'.format(grcnn.params))
 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
 initial_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
-sio.savemat('grcnn_matcher_initial.mat', initial_params)
+sio.savemat('grcnn_ranker_initial.mat', initial_params)
 # Check parameter size
 for param in hist_grads:
     logger.debug('Parameter Shape: {}'.format(param.shape))
-# Build training and test labels
-train_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in train_index])
-test_labels = np.asarray([1 if pidx == qidx else 0 for pidx, qidx in test_index])
-# Zip together
-start_time = time.time()
-tmp_train = [(train_pairs_set[pidx][0], train_pairs_set[qidx][1]) for pidx, qidx in train_index]
-tmp_test = [(test_pairs_set[pidx][0], test_pairs_set[qidx][1]) for pidx, qidx in test_index]
-train_instances = zip(tmp_train, train_labels)
-test_instances = zip(tmp_test, test_labels)
-logger.debug('Training instances size, including both positive and negative samples: %d' % len(train_instances))
-logger.debug('Test instances size, including both positive and negative samples: %d' % len(test_instances))
-end_time = time.time()
-logger.debug('Time used to build zipping training and test instances: %f seconds.' % (end_time-start_time))
 try: 
     start_time = time.time()
     # Multi-processes for batch learning
@@ -197,17 +170,21 @@ try:
         total_count = 0
         total_predictions = []
         # Compute the number of batches
-        num_batch = len(train_instances) / batch_size
+        num_batch = train_size / batch_size
         logger.debug('Batch size = %d' % batch_size)
         logger.debug('Total number of batches: %d' % num_batch)
         if args.gpu:
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             # Using GPU computation
-            for j in xrange(len(train_instances)):
+            for j in xrange(train_size):
                 if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
-                (sentL, sentR), label = train_instances[j]
-                r = grcnn.compute_cost_and_gradient(sentL, sentR, [label]) 
+                sentL, p_sentR = train_pairs_set[j]
+                nj = j
+                while nj == j: nj = random.randint(0, train_size)
+                n_sentR = train_pairs_set[nj][1]
+                # Call GrCNNMatchRanker
+                r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                 grad, cost, pred = r[:-2], r[-2], r[-1]
                 # Accumulate results
                 for gt, g in zip(total_grads, grad):
@@ -279,31 +256,36 @@ try:
                 grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)
-        train_labels = np.asarray(train_labels)
-        total_count = np.sum(total_predictions == train_labels)
+        total_count = np.sum(total_predictions)
         # Reporting after each training epoch
-        logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(len(train_instances))))
+        logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(train_size)))
         correct_count = 0
-        for j in xrange(len(test_instances)):
-            (sentL, sentR), label = test_instances[j]
-            plabel = grcnn.predict(sentL, sentR)[0]
-            if label == plabel: correct_count += 1
-        logger.debug('Test accuracy: %f' % (correct_count / float(len(test_index))))
+        for j in xrange(test_size):
+            sentL, p_sentR = test_pairs_set[j]
+            nj = j
+            while nj == j: nj = random.randint(0, test_size)
+            n_sentR = test_pairs_set[nj][1]
+            plabel = grcnn.predict(sentL, p_sentR, sentL, n_sentR)[0]
+            if plabel == 1: correct_count += 1
+        logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
         # Save the model
         logger.debug('Save current model...')ø
-        GrCNNMatcher.save('GrCNNMatcher-{}.pkl'.format(args.name), grcnn)
+        GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
     # Final total test
     start_time = time.time()
     correct_count = 0
-    for j in xrange(len(test_instances)):
-        (sentL, sentR), label = test_instances[j]
-        plabel = grcnn.predict(sentL, sentR)[0]
-        if label == plabel: correct_count += 1
+    for j in xrange(test_size):
+        sentL, p_sentR = test_pairs_set[j]
+        nj = j
+        while nj == j: nj = random.randint(0, test_size)
+        n_sentR = test_pairs_set[nj][1]
+        plabel = grcnn.predict(sentL, p_sentR, sentL, n_sentR)[0]
+        if plabel == 1: correct_count += 1
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
-    logger.debug('Test accuracy: %f' % (correct_count / float(len(test_index))))
+    logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
 except:
     logger.debug('!!!Error!!!')
     logger.debug('-' * 60)
@@ -312,5 +294,5 @@ except:
         pool.terminate()
     traceback.print_exc(file=sys.stdout)
 finally:            
-    logger.debug('Saving the model: GrCNNMatcher-{}.pkl.'.format(args.name))
-    GrCNNMatcher.save('GrCNNMatcher-{}.pkl'.format(args.name), grcnn)
+    logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
+    GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
