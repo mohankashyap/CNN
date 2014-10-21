@@ -32,6 +32,8 @@ class GrCNNEncoder(object):
         @config: GRCNNConfiger. Configer used to set the architecture of GRCNNEncoder.
         ''' 
         if verbose: logger.debug('Building Gated Recursive Convolutional Neural Network Encoder...')
+        # Scale factor for initializing parameters
+        scale = 100.0
         # Make theano symbolic tensor for input and model parameters
         self.input = T.matrix(name='GrCNN Encoder input', dtype=floatX)
         # Configure activation function
@@ -41,35 +43,30 @@ class GrCNNEncoder(object):
         # Set seed of the random generator
         np.random.seed(config.random_seed)
         # Projection matrix U
-        self.U = theano.shared(value=np.asarray(
-                    np.random.uniform(low=-np.sqrt(6.0/(fan_in+fan_out)),
-                                      high=np.sqrt(6.0/(fan_in+fan_out)),
-                                      size=(fan_in, fan_out)), dtype=floatX),
-                    name='U', borrow=True)
+        # Initialize all the matrices using orthogonal matrices
+        U_val = scale * np.random.rand(fan_in, fan_out).astype(floatX)
+        self.U = theano.shared(value=U_val, name='U', borrow=True)
         self.hidden0 = T.dot(self.input, self.U)
         # W^l, W^r, parameters used to construct the central hidden representation
-        self.Wl = theano.shared(value=np.asarray(
-                    np.random.uniform(low=-np.sqrt(6.0/(fan_out+fan_out)),
-                                      high=np.sqrt(6.0/(fan_out+fan_out)),
-                                      size=(fan_out, fan_out)), dtype=floatX),
-                    name='W_l', borrow=True)
-        self.Wr = theano.shared(value=np.asarray(
-                    np.random.uniform(low=-np.sqrt(6.0/(fan_out+fan_out)),
-                                      high=np.sqrt(6.0/(fan_out+fan_out)),
-                                      size=(fan_out, fan_out)), dtype=floatX),
-                    name='W_r', borrow=True)
+        Wl_val = np.random.rand(fan_out, fan_out).astype(floatX)
+        Wl_val, _, _ = np.linalg.svd(Wl_val)
+        Wl_val *= scale
+        self.Wl = theano.shared(value=Wl_val, name='W_l', borrow=True)
+
+        Wr_val = np.random.rand(fan_out, fan_out).astype(floatX)
+        Wr_val, _, _ = np.linalg.svd(Wr_val)
+        Wr_val *= scale
+        self.Wr = theano.shared(value=Wr_val, name='W_r', borrow=True)
+        
         self.Wb = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='Wb', borrow=True)
+        
         # G^l, G^r, parameters used to construct the three-way coefficients
-        self.Gl = theano.shared(value=np.asarray(
-                    np.random.uniform(low=-np.sqrt(6.0/(3+fan_out)),
-                                      high=np.sqrt(6.0/(3+fan_out)),
-                                      size=(fan_out, 3)), dtype=floatX),
-                    name='G_l', borrow=True)
-        self.Gr = theano.shared(value=np.asarray(
-                    np.random.uniform(low=-np.sqrt(6.0/(3+fan_out)),
-                                      high=np.sqrt(6.0/(3+fan_out)),
-                                      size=(fan_out, 3)), dtype=floatX),
-                    name='G_r', borrow=True)
+        Gl_val = scale * np.random.rand(fan_out, 3).astype(floatX)
+        self.Gl = theano.shared(value=Gl_val, name='G_l', borrow=True)
+
+        Gr_val = scale * np.random.rand(fan_out, 3).astype(floatX)
+        self.Gr = theano.shared(value=Gr_val, name='G_r', borrow=True)
+
         self.Gb = theano.shared(value=np.zeros(3, dtype=floatX), name='Gb', borrow=True)
         # Save all the parameters into one batch
         self.params = [self.U, self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
@@ -443,6 +440,9 @@ class GrCNNMatchScorer(object):
         self.compressed_hiddenN *= T.cast(maskN, floatX)
         # Score layers
         self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp)
+        # Reset the weights of the score layer
+        self.score_layer.W.set_value(np.asarray(np.random.uniform(low=-1.0, high=1.0, size=config.num_mlp),
+                            dtype=floatX))
         self.output = self.score_layer.output
         self.scoreP = self.score_layer.encode(self.compressed_hiddenP)
         self.scoreN = self.score_layer.encode(self.compressed_hiddenN)

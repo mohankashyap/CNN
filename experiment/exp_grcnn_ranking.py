@@ -33,7 +33,7 @@ from utils import floatX
 from config import GrCNNConfiger
 
 charas = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-default_name = ''.join([charas[random.randint(0, len(charas)-1)] for _ in xrange(5)])
+default_name = ''.join([charas[np.random.randint(0, len(charas))] for _ in xrange(5)])
 # Set the basic configuration of the logging system
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
@@ -81,7 +81,6 @@ start_time = time.time()
 # Beginning and trailing token for each sentence
 blank_token = word_embedding.wordvec('</s>')
 # Store original text representation
-train_pairs_txt, test_pairs_txt = train_pairs_txt, test_pairs_txt
 train_size = len(train_pairs_txt)
 test_size = len(test_pairs_txt)
 logger.debug('Size of training pairs: %d' % train_size)
@@ -122,7 +121,6 @@ for i, (psent, qsent) in enumerate(test_pairs_txt):
 end_time = time.time()
 logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
-
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
 config_filename = './grCNN_ranker.conf'
@@ -152,7 +150,7 @@ try:
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = train_pairs_set[j]
             nj = j
-            while nj == j: nj = random.randint(0, test_size-1)
+            while nj == j: nj = np.random.randint(0, test_size)
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
 
@@ -166,13 +164,11 @@ try:
                     gt += g
                 costs += cost
                 preds.append(score_p >= score_n)
-            # logger.debug('-' * 50)
+            logger.debug('-' * 50)
             logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
             logger.debug('HiddenL: {}'.format(hiddenL))
             logger.debug('HiddenR: {}'.format(hiddenR))
-            logger.debug('-' * 50)
-            # logger.debug('cost = {}'.format(cost))
-            # logger.debug('prediction = {}'.format(pred))
+            # logger.debug('-' * 50)
         # Each element of results is a three-element tuple, where the first element
         # accumulates the gradients, the second element accumulate the cost and the 
         # third element store the predictions
@@ -195,7 +191,7 @@ try:
                 if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
                 sentL, p_sentR = train_pairs_set[j]
                 nj = j
-                while nj == j: nj = random.randint(0, train_size-1)
+                while nj == j: nj = np.random.randint(0, train_size)
                 n_sentR = train_pairs_set[nj][1]
                 # Call GrCNNMatchRanker
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
@@ -211,7 +207,8 @@ try:
                     # AdaGrad updating
                     for grad, hist_grad in zip(total_grads, hist_grads):
                         grad /= batch_size
-                        grad /= fudge_factor + np.sqrt(hist_grad)
+                        # grad /= fudge_factor + np.sqrt(hist_grad)
+                    # Check total grads
                     grcnn.update_params(total_grads, learn_rate)
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                     hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -235,6 +232,8 @@ try:
                 results = [result.get() for result in results]
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                
+                batch_cost = 0.0
                 for result in results:
                     grad, cost, pred = result[0], result[1], result[2]
                     for gt, g in zip(total_grads, grad):
@@ -242,18 +241,33 @@ try:
                     for gt, g in zip(hist_grads, grad):
                         gt += np.square(g)
                     total_cost += cost
+                    batch_cost += cost
                     total_predictions += pred
                 # AdaGrad updating
                 for grad, hist_grad in zip(total_grads, hist_grads):
                     grad /= batch_size
-                    grad /= fudge_factor + np.sqrt(hist_grad)
+                    # grad /= fudge_factor + np.sqrt(hist_grad)
+                # Compute the norm of gradients 
+                grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
+                param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
+                param_names = [param.name for param in grcnn.params]                
+                logger.debug('#' * 50)
+                logger.debug('%8d batch @ %4d epoch' % (j, i))
+                logger.debug('Name of parameters: ')
+                logger.debug(param_names)
+                logger.debug('Gradient norms of parameters: ')
+                logger.debug(grad_norms)
+                logger.debug('Norms of the parameters: ')
+                logger.debug(param_norms)
+                logger.debug('Batch cost = %f' % batch_cost)
+
                 grcnn.update_params(total_grads, learn_rate)
 
             # Update all the rests
             for j in xrange(num_batch * batch_size, train_size):
                 sentL, p_sentR = train_pairs_set[j]
                 nj = j
-                while nj == j: nj = random.randint(0, train_size-1)
+                while nj == j: nj = np.random.randint(0, train_size)
                 n_sentR = train_pairs_set[j][1]
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                 hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
@@ -261,34 +275,51 @@ try:
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+
+                batch_cost = 0.0
                 for gt, g in zip(total_grads, grad):
                     gt += g
                 for gt, g in zip(hist_grads, grad):
                     gt += np.square(g)
                 total_cost += cost
                 total_predictions.append(score_p >= score_n)
-                logger.debug('-' * 50)
-                logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
-                logger.debug('HiddenL: {}'.format(hiddenL))
-                logger.debug('HiddenR: {}'.format(hiddenR))
+                # logger.debug('-' * 50)
+                # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
+                # logger.debug('HiddenL: {}'.format(hiddenL))
+                # logger.debug('HiddenR: {}'.format(hiddenR))
                 # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
                 grad /= train_size - num_batch*batch_size
-                grad /= fudge_factor + np.sqrt(hist_grad)
+                # grad /= fudge_factor + np.sqrt(hist_grad)
+
+            # Compute the norm of gradients 
+            grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
+            param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
+            param_names = [param.name for param in grcnn.params]                
+            logger.debug('#' * 50)
+            logger.debug('%8d batch @ %4d epoch' % (j, i))
+            logger.debug('Name of parameters: ')
+            logger.debug(param_names)
+            logger.debug('Gradient norms of parameters: ')
+            logger.debug(grad_norms)
+            logger.debug('Norms of the parameters: ')
+            logger.debug(param_norms)
+            logger.debug('Batch cost = %f' % batch_cost)
+
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)
         total_count = np.sum(total_predictions)
         # logger.debug('-' * 50)
         logger.debug('Total cost = %d' % total_count)
-        logger.debug('Total prediction = {}'.format(total_predictions))
+        # logger.debug('Total prediction = {}'.format(total_predictions))
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(train_size)))
         correct_count = 0
         for j in xrange(test_size):
             sentL, p_sentR = test_pairs_set[j]
             nj = j
-            while nj == j: nj = random.randint(0, test_size-1)
+            while nj == j: nj = np.random.randint(0, test_size)
             n_sentR = test_pairs_set[nj][1]
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
@@ -307,7 +338,7 @@ try:
     for j in xrange(test_size):
         sentL, p_sentR = test_pairs_set[j]
         nj = j
-        while nj == j: nj = random.randint(0, test_size-1)
+        while nj == j: nj = np.random.randint(0, test_size)
         n_sentR = test_pairs_set[nj][1]
         score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
         score_p, score_n = score_p[0], score_n[0]
@@ -328,7 +359,6 @@ finally:
     sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
     GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
-
 
 
 
