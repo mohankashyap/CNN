@@ -33,7 +33,7 @@ class GrCNNEncoder(object):
         ''' 
         if verbose: logger.debug('Building Gated Recursive Convolutional Neural Network Encoder...')
         # Scale factor for initializing parameters
-        scale = 100.0
+        self.scale = config.scale
         # Make theano symbolic tensor for input and model parameters
         self.input = T.matrix(name='GrCNN Encoder input', dtype=floatX)
         # Configure activation function
@@ -44,27 +44,32 @@ class GrCNNEncoder(object):
         np.random.seed(config.random_seed)
         # Projection matrix U
         # Initialize all the matrices using orthogonal matrices
-        U_val = scale * np.random.rand(fan_in, fan_out).astype(floatX)
+        U_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_in, fan_out))
+        U_val = U_val.astype(floatX)
+        U_val *= self.scale
         self.U = theano.shared(value=U_val, name='U', borrow=True)
         self.hidden0 = T.dot(self.input, self.U)
+
         # W^l, W^r, parameters used to construct the central hidden representation
-        Wl_val = np.random.rand(fan_out, fan_out).astype(floatX)
+        Wl_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, fan_out))
+        Wl_val = Wl_val.astype(floatX)
         Wl_val, _, _ = np.linalg.svd(Wl_val)
-        Wl_val *= scale
         self.Wl = theano.shared(value=Wl_val, name='W_l', borrow=True)
 
-        Wr_val = np.random.rand(fan_out, fan_out).astype(floatX)
+        Wr_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, fan_out))
+        Wr_val = Wr_val.astype(floatX)
         Wr_val, _, _ = np.linalg.svd(Wr_val)
-        Wr_val *= scale
         self.Wr = theano.shared(value=Wr_val, name='W_r', borrow=True)
         
         self.Wb = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='Wb', borrow=True)
         
         # G^l, G^r, parameters used to construct the three-way coefficients
-        Gl_val = scale * np.random.rand(fan_out, 3).astype(floatX)
+        Gl_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, 3))
+        Gl_val = Gl_val.astype(floatX)
         self.Gl = theano.shared(value=Gl_val, name='G_l', borrow=True)
 
-        Gr_val = scale * np.random.rand(fan_out, 3).astype(floatX)
+        Gr_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, 3))
+        Gr_val = Gr_val.astype(floatX)
         self.Gr = theano.shared(value=Gr_val, name='G_r', borrow=True)
 
         self.Gb = theano.shared(value=np.zeros(3, dtype=floatX), name='Gb', borrow=True)
