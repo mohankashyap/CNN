@@ -271,21 +271,21 @@ try:
                     total_predictions += pred
                 # AdaGrad updating
                 for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= batch_size
+                    # grad /= batch_size
                     grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
                 param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
                 param_names = [param.name for param in grcnn.params]                
-                logger.debug('#' * 50)
-                logger.debug('%8d batch @ %4d epoch' % (j, i))
-                logger.debug('Name of parameters: ')
-                logger.debug(param_names)
-                logger.debug('Gradient norms of parameters: ')
-                logger.debug(grad_norms)
-                logger.debug('Norms of the parameters: ')
-                logger.debug(param_norms)
-                logger.debug('Batch cost = %f' % batch_cost)
+                # logger.debug('#' * 50)
+                # logger.debug('%8d batch @ %4d epoch' % (j, i))
+                # logger.debug('Name of parameters: ')
+                # logger.debug(param_names)
+                # logger.debug('Gradient norms of parameters: ')
+                # logger.debug(grad_norms)
+                # logger.debug('Norms of the parameters: ')
+                # logger.debug(param_norms)
+                # logger.debug('Batch cost = %f' % batch_cost)
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
             for j in xrange(num_batch * batch_size, train_size):
@@ -315,7 +315,7 @@ try:
                 # logger.debug('HiddenR: {}'.format(hiddenR))
                 # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
-                grad /= train_size - num_batch*batch_size
+                # grad /= train_size - num_batch*batch_size
                 grad /= fudge_factor + np.sqrt(hist_grad)
             # Compute the norm of gradients 
             grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
