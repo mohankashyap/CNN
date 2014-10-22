@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
-# matching_train_filename = '../data/small_pair_train.txt'
-# matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/small_pair_train.txt'
+matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -144,6 +144,25 @@ highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 # Check parameter size
 for param in hist_grads:
     logger.debug('Parameter Shape: {}'.format(param.shape))
+
+
+# Fixing training and test pairs
+start_time = time.time()
+train_neg_index = range(train_size)
+test_neg_index = range(test_size)
+def train_rand(idx):
+    nidx = idx
+    while nidx == idx: nidx = np.random.randint(0, train_size)
+    return idx
+def test_rand(idx):
+    nidx = idx
+    while nidx == idx: nidx = np.random.randint(0, test_size)
+    return idx
+train_neg_index = map(train_rand, train_neg_index)
+test_neg_index = map(test_rand, test_neg_index)
+end_time = time.time()
+logger.debug('Time used to generate negative training and test pairs: %f seconds.' % (end_time-start_time))
+
 try: 
     start_time = time.time()
     # Multi-processes for batch learning
@@ -151,8 +170,10 @@ try:
         grads, costs, preds = [], 0.0, []
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = train_pairs_set[j]
-            nj = j
-            while nj == j: nj = np.random.randint(0, test_size)
+            # nj = j
+            # while nj == j: nj = np.random.randint(0, test_size)
+            nj = train_neg_index[j]
+
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
 
@@ -192,8 +213,10 @@ try:
             for j in xrange(train_size):
                 if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
                 sentL, p_sentR = train_pairs_set[j]
-                nj = j
-                while nj == j: nj = np.random.randint(0, train_size)
+                # nj = j
+                # while nj == j: nj = np.random.randint(0, train_size)
+                nj = train_neg_index[j]
+
                 n_sentR = train_pairs_set[nj][1]
                 # Call GrCNNMatchRanker
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
@@ -253,21 +276,23 @@ try:
                 grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
                 param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
                 param_names = [param.name for param in grcnn.params]                
-                # logger.debug('#' * 50)
-                # logger.debug('%8d batch @ %4d epoch' % (j, i))
-                # logger.debug('Name of parameters: ')
-                # logger.debug(param_names)
-                # logger.debug('Gradient norms of parameters: ')
-                # logger.debug(grad_norms)
-                # logger.debug('Norms of the parameters: ')
-                # logger.debug(param_norms)
-                # logger.debug('Batch cost = %f' % batch_cost)
+                logger.debug('#' * 50)
+                logger.debug('%8d batch @ %4d epoch' % (j, i))
+                logger.debug('Name of parameters: ')
+                logger.debug(param_names)
+                logger.debug('Gradient norms of parameters: ')
+                logger.debug(grad_norms)
+                logger.debug('Norms of the parameters: ')
+                logger.debug(param_norms)
+                logger.debug('Batch cost = %f' % batch_cost)
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
             for j in xrange(num_batch * batch_size, train_size):
                 sentL, p_sentR = train_pairs_set[j]
-                nj = j
-                while nj == j: nj = np.random.randint(0, train_size)
+                # nj = j
+                # while nj == j: nj = np.random.randint(0, train_size)
+                nj = train_neg_index[j]
+
                 n_sentR = train_pairs_set[j][1]
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                 hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
@@ -295,14 +320,14 @@ try:
             grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
             param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
             param_names = [param.name for param in grcnn.params]                
-            # logger.debug('#' * 50)
-            # logger.debug('Name of parameters: ')
-            # logger.debug(param_names)
-            # logger.debug('Gradient norms of parameters: ')
-            # logger.debug(grad_norms)
-            # logger.debug('Norms of the parameters: ')
-            # logger.debug(param_norms)
-            # logger.debug('Batch cost = %f' % batch_cost)
+            logger.debug('#' * 50)
+            logger.debug('Name of parameters: ')
+            logger.debug(param_names)
+            logger.debug('Gradient norms of parameters: ')
+            logger.debug(grad_norms)
+            logger.debug('Norms of the parameters: ')
+            logger.debug(param_norms)
+            logger.debug('Batch cost = %f' % batch_cost)
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)
@@ -314,16 +339,21 @@ try:
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
         if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
         correct_count = 0
+        total_cost = 0.0
         for j in xrange(test_size):
             sentL, p_sentR = test_pairs_set[j]
-            nj = j
-            while nj == j: nj = np.random.randint(0, test_size)
+            # nj = j
+            # while nj == j: nj = np.random.randint(0, test_size)
+            nj = test_neg_index[j]
+
             n_sentR = test_pairs_set[nj][1]
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
+            if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
             if score_p >= score_n: correct_count += 1
         test_accuracy = correct_count / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
+        logger.debug('Test total cost: %f' % total_cost)
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
         # Save the model
         logger.debug('Save current model...')
@@ -335,17 +365,22 @@ try:
     # Final total test
     start_time = time.time()
     correct_count = 0
+    total_cost = 0.0
     for j in xrange(test_size):
         sentL, p_sentR = test_pairs_set[j]
-        nj = j
-        while nj == j: nj = np.random.randint(0, test_size)
+        # nj = j
+        # while nj == j: nj = np.random.randint(0, test_size)
+        nj = test_neg_index[j]
+
         n_sentR = test_pairs_set[nj][1]
         score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
         score_p, score_n = score_p[0], score_n[0]
         if score_p >= score_n: correct_count += 1
+        if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
+    logger.debug('Test total cost: %f' % total_cost)
     logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
     logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:

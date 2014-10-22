@@ -460,7 +460,7 @@ class BRNNEncoder(object):
 		# Compute the forward and backward representation over time
 		self.h_forwards, _ = theano.scan(fn=self._forward_step, 
 										 sequences=self.input, 
-										 outputs_info=[self.h0_farward],
+										 outputs_info=[self.h0_forward],
 										 truncate_gradient=config.bptt)
 		self.h_backwards, _ = theano.scan(fn=self._backward_step,
 										  sequences=self.input,
@@ -535,7 +535,7 @@ class BRNNMatcher(object):
 		# Activation function
 		self.act = Activation(config.activation)
 		# MLP Component
-		self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=1)
+		self.hidden = T.concatenate([self.hiddenL, self.hiddenR])
 		self.hidden_layer = HiddenLayer(self.hidden, 
 										(2*config.num_hidden, config.num_mlp), 
 										act=Activation(config.hiddenact))

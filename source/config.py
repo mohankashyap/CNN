@@ -177,7 +177,7 @@ class RNNConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.hiddenact, self.num_input, self.num_hidden, 
+		self.activation, self.hiddenact, self.num_input, self.num_hidden, \
 		self.num_mlp, self.num_class, \
 		self.regularization, self.lambda1, self.lambda2, self.dropout, \
 		self.random_seed, self.bptt = self.parse()
@@ -190,7 +190,7 @@ class RNNConfiger(object):
 		return self._cf_parser.get(cfg_object, cfg_section)
 
 	def parse(self):
-		activation = self._cf_parser.get('functions', 'activations')
+		activation = self._cf_parser.get('functions', 'activation')
 		hiddenact = self._cf_parser.get('functions', 'hiddenact')
 		num_input = self._cf_parser.getint('architectures', 'input')
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
