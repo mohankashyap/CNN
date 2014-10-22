@@ -401,9 +401,8 @@ class GrCNNMatchScorer(object):
         self.encoderR = GrCNNEncoder(config, verbose)
         # Link the parameters of two parts
         self.params = []
-        # self.params += self.encoderL.params
-        # self.params += self.encoderR.params
-
+        self.params += self.encoderL.params
+        self.params += self.encoderR.params
         # Build three kinds of inputs:
         # 1, inputL, inputR. This pair is used for computing the score after training
         # 2, inputPL, inputPR. This part is used for training positive pairs
