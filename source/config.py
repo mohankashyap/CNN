@@ -177,7 +177,8 @@ class RNNConfiger(object):
 		self._cf_parser = ConfigParser.ConfigParser()
 		self._cf_parser.read(fname)
 		# Parsing 
-		self.activation, self.num_input, self.num_hidden, self.num_class, \
+		self.activation, self.hiddenact, self.num_input, self.num_hidden, 
+		self.num_mlp, self.num_class, \
 		self.regularization, self.lambda1, self.lambda2, self.dropout, \
 		self.random_seed, self.bptt = self.parse()
 
@@ -190,8 +191,10 @@ class RNNConfiger(object):
 
 	def parse(self):
 		activation = self._cf_parser.get('functions', 'activations')
+		hiddenact = self._cf_parser.get('functions', 'hiddenact')
 		num_input = self._cf_parser.getint('architectures', 'input')
 		num_hidden = self._cf_parser.getint('architectures', 'hidden')
+		num_mlp = self._cf_parser.getint('architectures', 'mlp')
 		num_class = self._cf_parser.getint('architectures', 'class')
 		regularization = self._cf_parser.getint('parameters', 'regularization')
 		# L1-norm regularization of the penalty function				
@@ -201,7 +204,7 @@ class RNNConfiger(object):
 		dropout = self._cf_parser.getfloat('parameters', 'dropout')
 		random_seed = self._cf_parser.getint('parameters', 'random_seed')
 		bptt = self._cf_parser.getint('parameters', 'bptt')
-		return (activation, num_input, num_hidden, num_class, \
+		return (activation, hiddenact, num_input, num_hidden, num_mlp, num_class, \
 				regularization, lambda1, lambda2, dropout, random_seed, bptt)
 
 class GrCNNConfiger(object):
