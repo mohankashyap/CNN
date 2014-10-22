@@ -54,11 +54,13 @@ class GrCNNEncoder(object):
         Wl_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, fan_out))
         Wl_val = Wl_val.astype(floatX)
         Wl_val, _, _ = np.linalg.svd(Wl_val)
+        # Wl_val *= self.scale
         self.Wl = theano.shared(value=Wl_val, name='W_l', borrow=True)
 
         Wr_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, fan_out))
         Wr_val = Wr_val.astype(floatX)
         Wr_val, _, _ = np.linalg.svd(Wr_val)
+        # Wr_val *= self.scale
         self.Wr = theano.shared(value=Wr_val, name='W_r', borrow=True)
         
         self.Wb = theano.shared(value=np.zeros(fan_out, dtype=floatX), name='Wb', borrow=True)

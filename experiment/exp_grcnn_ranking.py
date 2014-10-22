@@ -139,6 +139,8 @@ logger.debug('GrCNNMatchRanker.params: {}'.format(grcnn.params))
 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
 initial_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
 sio.savemat('grcnn_ranker_initial.mat', initial_params)
+# Record the highest training and test accuracy during training process
+highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 # Check parameter size
 for param in hist_grads:
     logger.debug('Parameter Shape: {}'.format(param.shape))
@@ -164,10 +166,10 @@ try:
                     gt += g
                 costs += cost
                 preds.append(score_p >= score_n)
-            logger.debug('-' * 50)
-            logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
-            logger.debug('HiddenL: {}'.format(hiddenL))
-            logger.debug('HiddenR: {}'.format(hiddenR))
+            # logger.debug('-' * 50)
+            # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
+            # logger.debug('HiddenL: {}'.format(hiddenL))
+            # logger.debug('HiddenR: {}'.format(hiddenR))
             # logger.debug('-' * 50)
         # Each element of results is a three-element tuple, where the first element
         # accumulates the gradients, the second element accumulate the cost and the 
@@ -246,7 +248,7 @@ try:
                 # AdaGrad updating
                 for grad, hist_grad in zip(total_grads, hist_grads):
                     grad /= batch_size
-                    # grad /= fudge_factor + np.sqrt(hist_grad)
+                    grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
                 param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
@@ -260,9 +262,7 @@ try:
                 logger.debug('Norms of the parameters: ')
                 logger.debug(param_norms)
                 logger.debug('Batch cost = %f' % batch_cost)
-
                 grcnn.update_params(total_grads, learn_rate)
-
             # Update all the rests
             for j in xrange(num_batch * batch_size, train_size):
                 sentL, p_sentR = train_pairs_set[j]
@@ -290,14 +290,12 @@ try:
                 # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
                 grad /= train_size - num_batch*batch_size
-                # grad /= fudge_factor + np.sqrt(hist_grad)
-
+                grad /= fudge_factor + np.sqrt(hist_grad)
             # Compute the norm of gradients 
             grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
             param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
             param_names = [param.name for param in grcnn.params]                
             logger.debug('#' * 50)
-            logger.debug('%8d batch @ %4d epoch' % (j, i))
             logger.debug('Name of parameters: ')
             logger.debug(param_names)
             logger.debug('Gradient norms of parameters: ')
@@ -305,16 +303,16 @@ try:
             logger.debug('Norms of the parameters: ')
             logger.debug(param_norms)
             logger.debug('Batch cost = %f' % batch_cost)
-
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)
         total_count = np.sum(total_predictions)
+        train_accuracy = total_count / float(train_size)
         # logger.debug('-' * 50)
-        logger.debug('Total cost = %d' % total_count)
         # logger.debug('Total prediction = {}'.format(total_predictions))
         # Reporting after each training epoch
-        logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, total_count / float(train_size)))
+        logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
+        if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
         correct_count = 0
         for j in xrange(test_size):
             sentL, p_sentR = test_pairs_set[j]
@@ -324,7 +322,9 @@ try:
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p >= score_n: correct_count += 1
-        logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
+        test_accuracy = correct_count / float(test_size)
+        logger.debug('Test accuracy: %f' % test_accuracy)
+        if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
         # Save the model
         logger.debug('Save current model...')
         params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
@@ -346,6 +346,8 @@ try:
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
+    logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
+    logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:
     logger.debug('!!!Error!!!')
     logger.debug('-' * 60)
@@ -359,7 +361,3 @@ finally:
     sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
     GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
-
-
-
-
