@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-# matching_train_filename = '../data/pair_all_sentence_train.txt'
-# matching_test_filename = '../data/pair_sentence_test.txt'
-matching_train_filename = '../data/small_pair_train.txt'
-matching_test_filename = '../data/small_pair_test.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
+# matching_train_filename = '../data/small_pair_train.txt'
+# matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -198,6 +198,7 @@ try:
         return grads, costs, preds
 
     for i in xrange(configer.nepoch):
+        logger.debug('-' * 50)
         # Looper over training instances
         total_cost = 0.0
         total_count = 0
@@ -320,14 +321,14 @@ try:
             grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
             param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
             param_names = [param.name for param in grcnn.params]                
-            logger.debug('#' * 50)
-            logger.debug('Name of parameters: ')
-            logger.debug(param_names)
-            logger.debug('Gradient norms of parameters: ')
-            logger.debug(grad_norms)
-            logger.debug('Norms of the parameters: ')
-            logger.debug(param_norms)
-            logger.debug('Batch cost = %f' % batch_cost)
+            # logger.debug('#' * 50)
+            # logger.debug('Name of parameters: ')
+            # logger.debug(param_names)
+            # logger.debug('Gradient norms of parameters: ')
+            # logger.debug(grad_norms)
+            # logger.debug('Norms of the parameters: ')
+            # logger.debug(param_norms)
+            # logger.debug('Batch cost = %f' % batch_cost)
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         total_predictions = np.asarray(total_predictions)

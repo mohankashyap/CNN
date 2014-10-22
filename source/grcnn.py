@@ -495,7 +495,7 @@ class GrCNNMatchScorer(object):
         '''
         for param, grad in zip(self.params, grads):
             p = param.get_value(borrow=True)
-            param.set_value(p - learn_rate * p, borrow=True)
+            param.set_value(p - learn_rate * grad, borrow=True)
 
     @staticmethod
     def save(fname, model):
