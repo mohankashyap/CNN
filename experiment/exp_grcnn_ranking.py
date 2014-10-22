@@ -145,7 +145,6 @@ highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 for param in hist_grads:
     logger.debug('Parameter Shape: {}'.format(param.shape))
 
-
 # Fixing training and test pairs
 start_time = time.time()
 train_neg_index = range(train_size)

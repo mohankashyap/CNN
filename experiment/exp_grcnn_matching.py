@@ -254,7 +254,7 @@ try:
                     total_predictions += pred
                 # AdaGrad updating
                 for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= batch_size
+                    # grad /= batch_size
                     grad /= fudge_factor + np.sqrt(hist_grad)
                 grcnn.update_params(total_grads, learn_rate)
 
@@ -274,7 +274,7 @@ try:
                 total_predictions.append(pred[0])
             # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
-                grad /= len(train_index) - num_batch*batch_size
+                # grad /= len(train_index) - num_batch*batch_size
                 grad /= fudge_factor + np.sqrt(hist_grad)
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
@@ -290,7 +290,7 @@ try:
             if label == plabel: correct_count += 1
         logger.debug('Test accuracy: %f' % (correct_count / float(len(test_index))))
         # Save the model
-        logger.debug('Save current model...')ø
+        logger.debug('Save current model...')
         GrCNNMatcher.save('GrCNNMatcher-{}.pkl'.format(args.name), grcnn)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
