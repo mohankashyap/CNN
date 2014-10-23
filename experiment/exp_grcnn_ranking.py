@@ -342,10 +342,7 @@ try:
         total_cost = 0.0
         for j in xrange(test_size):
             sentL, p_sentR = test_pairs_set[j]
-            # nj = j
-            # while nj == j: nj = np.random.randint(0, test_size)
             nj = test_neg_index[j]
-
             n_sentR = test_pairs_set[nj][1]
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
@@ -368,10 +365,7 @@ try:
     total_cost = 0.0
     for j in xrange(test_size):
         sentL, p_sentR = test_pairs_set[j]
-        # nj = j
-        # while nj == j: nj = np.random.randint(0, test_size)
         nj = test_neg_index[j]
-
         n_sentR = test_pairs_set[nj][1]
         score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
         score_p, score_n = score_p[0], score_n[0]

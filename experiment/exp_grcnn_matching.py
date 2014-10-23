@@ -254,7 +254,7 @@ try:
                     total_predictions += pred
                 # AdaGrad updating
                 for grad, hist_grad in zip(total_grads, hist_grads):
-                    # grad /= batch_size
+                    grad /= batch_size
                     grad /= fudge_factor + np.sqrt(hist_grad)
                 grcnn.update_params(total_grads, learn_rate)
 
@@ -274,7 +274,7 @@ try:
                 total_predictions.append(pred[0])
             # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
-                # grad /= len(train_index) - num_batch*batch_size
+                grad /= len(train_index) - num_batch*batch_size
                 grad /= fudge_factor + np.sqrt(hist_grad)
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
