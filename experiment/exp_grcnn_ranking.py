@@ -179,6 +179,18 @@ try:
             costs += cost
             preds.append(score_p >= score_n)
         return grads, costs, preds
+    # Multi-processes for batch testing
+    def parallel_predict(start_idx, end_idx):
+        costs, preds = 0.0, []
+        for j in xrange(start_idx, end_idx):
+            sentL, p_sentR = test_pairs_set[j]
+            nj = test_neg_index[j]
+            n_sentR = test_pairs_set[nj][1]
+            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = score_p[0], score_n[0]
+            if score_p < 1+score_n: costs += 1-score_p+score_n
+            preds.append(score_p >= score_n)
+        return costs, preds
 
     for i in xrange(configer.nepoch):
         logger.debug('-' * 50)
@@ -261,7 +273,7 @@ try:
                 for j in xrange(num_batch * batch_size, train_size):
                     sentL, p_sentR = train_pairs_set[j]
                     nj = train_neg_index[j]
-                    n_sentR = train_pairs_set[j][1]
+                    n_sentR = train_pairs_set[nj][1]
                     r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                     inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
                     for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
@@ -285,19 +297,39 @@ try:
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
         if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
-        correct_count = 0
-        total_cost = 0.0
-        for j in xrange(test_size):
-            sentL, p_sentR = test_pairs_set[j]
-            nj = test_neg_index[j]
-            n_sentR = test_pairs_set[nj][1]
-            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-            score_p, score_n = score_p[0], score_n[0]
-            if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
-            if score_p >= score_n: correct_count += 1
-        test_accuracy = correct_count / float(test_size)
+        # Testing after each training epoch
+        t_num_batch = test_size / batch_size
+        test_costs, test_predictions = 0.0, []
+        for j in xrange(t_num_batch):
+            start_idx = j * batch_size
+            step = batch_size / num_processes
+            # Creating Process Pool
+            pool = Pool(num_processes)
+            results = []
+            for k in xrange(num_processes):
+                results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+                start_idx += step
+            pool.close()
+            pool.join()
+            # Accumulate results
+            results = [result.get() for result in results]
+            # Map-Reduce
+            for result in results:
+                test_costs += result[0]
+                test_predictions += result[1]
+        if t_num_batch * batch_size < test_size:
+            for j in xrange(t_num_batch * batch_size, test_size):
+                sentL, p_sentR = test_pairs_set[j]
+                nj = test_neg_index[j]
+                n_sentR = test_pairs_set[nj][1]
+                score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                score_p, score_n = score_p[0], score_n[0]
+                if score_p < 1+score_n: test_costs += 1-score_p+score_n
+                test_predictions.append(score_p >= score_n)
+        test_predictions = np.asarray(test_predictions)
+        test_accuracy = np.sum(test_predictions) / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
-        logger.debug('Test total cost: %f' % total_cost)
+        logger.debug('Test total cost: %f' % test_costs)
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
         # Save the model
         logger.debug('Save current model and parameters...')
@@ -308,20 +340,40 @@ try:
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
     # Final total test
     start_time = time.time()
-    correct_count = 0
-    total_cost = 0.0
-    for j in xrange(test_size):
-        sentL, p_sentR = test_pairs_set[j]
-        nj = test_neg_index[j]
-        n_sentR = test_pairs_set[nj][1]
-        score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-        score_p, score_n = score_p[0], score_n[0]
-        if score_p >= score_n: correct_count += 1
-        if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
+    t_num_batch = test_size / batch_size
+    test_costs, test_predictions = 0.0, []
+    for j in xrange(t_num_batch):
+        start_idx = j * batch_size
+        step = batch_size / num_processes
+        # Creating Process Pool
+        pool = Pool(num_processes)
+        results = []
+        for k in xrange(num_processes):
+            results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+            start_idx += step
+        pool.close()
+        pool.join()
+        # Accumulate results
+        results = [result.get() for result in results]
+        # Map-Reduce
+        for result in results:
+            test_costs += result[0]
+            test_predictions += result[1]
+    if t_num_batch * batch_size < test_size:
+        for j in xrange(t_num_batch * batch_size, test_size):
+            sentL, p_sentR = test_pairs_set[j]
+            nj = test_neg_index[j]
+            n_sentR = test_pairs_set[nj][1]
+            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = score_p[0], score_n[0]
+            if score_p < 1+score_n: test_costs += 1-score_p+score_n
+            test_predictions.append(score_p >= score_n)
+    test_predictions = np.asarray(test_predictions)
+    test_accuracy = np.sum(test_predictions) / float(test_size)
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
-    logger.debug('Test accuracy: %f' % (correct_count / float(test_size)))
-    logger.debug('Test total cost: %f' % total_cost)
+    logger.debug('Test accuracy: %f' % test_accuracy)
+    logger.debug('Test total cost: %f' % test_costs)
     logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
     logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:
