@@ -187,7 +187,7 @@ try:
                 costs += cost
                 preds.append(score_p >= score_n)
             # logger.debug('-' * 50)
-            # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
+            logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
             # logger.debug('HiddenL: {}'.format(hiddenL))
             # logger.debug('HiddenR: {}'.format(hiddenR))
             # logger.debug('-' * 50)
