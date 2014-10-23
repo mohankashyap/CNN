@@ -11,6 +11,7 @@ import theano
 import theano.tensor as T
 import time
 import cPickle
+import logging
 from pprint import pprint
 
 import config
@@ -18,6 +19,8 @@ import utils
 from utils import floatX
 from activations import Activation
 from logistic import SoftmaxLayer
+
+logger = logging.getLogger(__name__)
 
 class RNN(object):
 	'''
@@ -336,8 +339,10 @@ class BRNN(object):
 		self.backward_h, _ = theano.scan(fn=backward_step, sequences=self.input, outputs_info=[self.h_end], 
 										 truncate_gradient=configs.bptt, go_backwards=True)
 		# Store the final value
-		self.h_start_star = self.forward_h[-1]
-		self.h_end_star = self.backward_h[-1]
+		# self.h_start_star = self.forward_h[-1]
+		# self.h_end_star = self.backward_h[-1]
+		self.h_start_star = T.mean(self.forward_h, axis=0)
+		self.h_end_star = T.mean(self.backward_h, axis=0)
 		# L1, L2 regularization
 		self.L1_norm = T.sum(T.abs_(self.W_forward) + T.abs_(self.W_backward) + \
 							 T.abs_(self.U_forward) + T.abs_(self.U_backward) + \
@@ -353,6 +358,10 @@ class BRNN(object):
 		##################################################################################
 		# Concatenate these two vectors into one
 		self.h = T.concatenate([self.h_start_star, self.h_end_star], axis=0)
+		# Dropout parameter
+		srng = T.shared_randomstreams.RandomStreams(configs.random_seed)
+		mask = srng.binomial(n=1, p=1-configs.dropout, size=self.h.shape)
+		self.h *= T.cast(mask, floatX)
 		# Use concatenated vector as input to the Softmax/MLP classifier
 		self.output = T.nnet.softmax(T.dot(self.h, self.W_softmax) + self.b_softmax)		
 		self.pred = T.argmax(self.output, axis=1)
@@ -385,10 +394,6 @@ class BRNN(object):
 			pprint('Number of free parameters in BRNN: %d' % self.num_params)
 			pprint('*' * 50)
 
-	def train(self, input, truth, learn_rate):
-		cost = self.objective(input, truth, learn_rate)
-		return cost
-
 	# This method is used to implement the batch updating algorithm
 	def update_params(self, gradtheta, learn_rate):
 		# gradparams is a single long vector which can be used to update self.theta
@@ -407,28 +412,201 @@ class BRNN(object):
 			return cPickle.load(fin)
 
 
-class BRNNSentence(BRNN):
+class BRNNEncoder(object):
 	'''
-	Bidirectional BRNN with gated (weighting) intermediate representation.
+	Bidirectional RNN for sequence encoding. 
 	'''
-	def __init__(self, configs, verbose=True):
-		# Call parent's class method to build the basic architecture of BRNN
-		super(BRNN, self).__init__(configs, verbose)
+	def __init__(self, config, verbose=True):
+		if verbose: logger.debug('Building Bidirectional RNN Encoder...')
+		self.input = T.matrix(name='BRNNEncoder_input')
+		# Configure Activation function
+		self.act = Activation(config.activation)
+		# Build Bidirectional RNN
+		num_input, num_hidden = config.num_input, config.num_hidden
+		self.num_params = 2 * (num_input * num_hidden + num_hidden * num_hidden + num_hidden)
+		# Initialize model parameters
+		np.random.seed(config.random_seed)
+		# 1, Feed-forward matrix for forward direction: W_forward
+		W_forward_val = np.random.uniform(low=-1.0, high=1.0, size=(num_input, num_hidden))
+		W_forward_val = W_forward_val.astype(floatX)
+		self.W_forward = theano.shared(value=W_forward_val, name='W_forward', borrow=True)
+		# 1, Feed-forward matrix for backward direction: W_backward
+		W_backward_val = np.random.uniform(low=-1.0, high=1.0, size=(num_input, num_hidden))
+		W_backward_val = W_backward_val.astype(floatX)
+		self.W_backward = theano.shared(value=W_backward_val, name='W_backward', borrow=True)
+		# 2, Recurrent matrix for forward direction: U_forward
+		U_forward_val = np.random.uniform(low=-1.0, high=1.0, size=(num_hidden, num_hidden))
+		U_forward_val = U_forward_val.astype(floatX)
+		U_forward_val, _, _ = np.linalg.svd(U_forward_val)
+		self.U_forward = theano.shared(value=U_forward_val, name='U_forward', borrow=True)
+		# 2, Recurrent matrix for backward direction: U_backward
+		U_backward_val = np.random.uniform(low=-1.0, high=1.0, size=(num_hidden, num_hidden))
+		U_backward_val = U_backward_val.astype(floatX)
+		U_backward_val, _, _ = np.linalg.svd(U_backward_val)
+		self.U_backward = theano.shared(value=U_backward_val, name='U_backward', borrow=True)
+		# 3, Bias parameter for the hidden-layer forward direction RNN
+		b_forward_val = np.zeros(num_hidden, dtype=floatX)
+		self.b_forward = theano.shared(value=b_forward_val, name='b_forward', borrow=True)
+		# 3, Bias parameter for the hidden-layer backward direction RNN
+		b_backward_val = np.zeros(num_hidden, dtype=floatX)
+		self.b_backward = theano.shared(value=b_backward_val, name='b_backward', borrow=True)
+		# h[0], zero vectors, treated as constants
+		h0_val = np.zeros(num_hidden, dtype=floatX)
+		self.h0_forward = theano.shared(value=h0_val, name='h0_forward', borrow=True)
+		self.h0_backward = theano.shared(value=h0_val, name='h0_backward', borrow=True)
+		# Stack all the parameters
+		self.params = [self.W_forward, self.W_backward, self.U_forward, self.U_backward, 
+					   self.b_forward, self.b_backward]
+		# Compute the forward and backward representation over time
+		self.h_forwards, _ = theano.scan(fn=self._forward_step, 
+										 sequences=self.input, 
+										 outputs_info=[self.h0_forward],
+										 truncate_gradient=config.bptt)
+		self.h_backwards, _ = theano.scan(fn=self._backward_step,
+										  sequences=self.input,
+										  outputs_info=[self.h0_backward],
+										  truncate_gradient=config.bptt,
+										  go_backwards=True)
+		# Average compressing
+		self.h_forward = T.mean(self.h_forwards, axis=0)
+		self.h_backward = T.mean(self.h_backwards, axis=0)
+		# Concatenate
+		self.output = T.concatenate([self.h_forward, self.h_backward], axis=0)
+		# L1, L2 regularization
+		self.L1_norm = T.sum(T.abs_(self.W_forward) + T.abs_(self.W_backward) + 
+							 T.abs_(self.U_forward) + T.abs_(self.U_backward))
+		self.L2_norm = T.sum(self.W_forward ** 2) + T.sum(self.W_backward ** 2) + \
+					   T.sum(self.U_forward ** 2) + T.sum(self.U_backward ** 2)
 		if verbose:
-			pprint('*' * 50)
-			pprint('Finished constructing Bidirectional Recurrent Neural Network (BRNN) for Sentence model.')
-						
+			logger.debug('Finished constructing the structure of BRNN Encoder: ')
+			logger.debug('Size of the input dimension: %d' % num_input)
+			logger.debug('Size of the hidden dimension: %d' % num_hidden)
+			logger.debug('Activation function: %s' % config.activation)
+
+	def _forward_step(self, x_t, h_tm1):
+		h_t = self.act.activate(T.dot(x_t, self.W_forward) + \
+								T.dot(h_tm1, self.U_forward) + \
+								self.b_forward)
+		return h_t
+
+	def _backward_step(self, x_t, h_tm1):
+		h_t = self.act.activate(T.dot(x_t, self.W_backward) + \
+								T.dot(h_tm1, self.U_backward) + \
+								self.b_backward)
+		return h_t				
+
+	def encode(self, inputM):
+		'''
+		@inputM: Theano symbol matrix. Compress the input matrix into output vector.
+		'''
+		h_forwards, _ = theano.scan(fn=self._forward_step, 
+									sequences=inputM,
+									outputs_info=[self.h0_forward])
+		h_backwards, _ = theano.scan(fn=self._backward_step, 
+									 sequences=inputM,
+									 outputs_info=[self.h0_backward],
+									 go_backwards=True)
+		# Averaging
+		h_forward = T.mean(h_forwards, axis=0)
+		h_backward = T.mean(h_backwards, axis=0)
+		# Concatenate
+		h = T.concatenate([h_forward, h_backward], axis=0)
+		return h
 
 
+class BRNNMatcher(object):
+	'''
+	Bidirectional RNN for text matching as a classification problem.
+	'''
+	def __init__(self, config, verbose=True):
+		# Construct two BRNNEncoders for matching two sentences
+		self.encoderL = BRNNEncoder(config, verbose)
+		self.encoderR = BRNNEncoder(config, verbose)
+		# Link two parts
+		self.params = []
+		self.params += self.encoderL.params
+		self.params += self.encoderR.params
+		# Set up input
+		self.inputL = self.encoderL.input
+		self.inputR = self.encoderR.input
+		# Get output of two BRNNEncoders
+		self.hiddenL = self.encoderL.output
+		self.hiddenR = self.encoderR.output
+		# Activation function
+		self.act = Activation(config.activation)
+		# MLP Component
+		self.hidden = T.concatenate([self.hiddenL, self.hiddenR])
+		self.hidden_layer = HiddenLayer(self.hidden, 
+										(2*config.num_hidden, config.num_mlp), 
+										act=Activation(config.hiddenact))
+		self.compressed_hidden = self.hidden_layer.output
+		# Accumulate parameters
+		self.params += self.hidden_layer.params
+		# Dropout parameter
+		srng = T.shared_randomstreams.RandomStreams(config.random_seed)
+		mask = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hidden.shape)
+		self.compressed_hidden *= T.cast(mask, floatX)
+		# Logistic regression
+		self.logistic_layer = LogisticLayer(self.compressed_hidden, config.num_mlp)
+		self.output = self.logistic_layer.output
+		self.pred = self.logistic_layer.pred
+		# Accumulate parameters
+		self.params += self.logistic_layer.params
+		# Compute the total number of parameters in the model
+		self.num_params_encoder = self.encoderL.num_params + self.encoderR.num_params
+		self.num_params_classifier = 2 * config.num_hidden * config.num_mlp + config.num_mlp + \
+									 config.num_mlp + 1
+		self.num_params = self.num_params_encoder + self.num_params_classifier
+		# Build target function
+		self.truth = T.ivector(name='label')
+		self.cost = self.logistic_layer.NLL_loss(self.truth)
+		# Build computational graph and compute the gradients of the model parameters
+		# with respect to the cost function
+		self.gradparams = T.grad(self.cost, self.params)
+		# Compile theano function
+		self.objective = theano.function(inputs=[self.inputL, self.inputR, self.truth], outputs=self.cost)
+		self.predict = theano.function(inputs=[self.inputL, self.inputR], outputs=self.pred)
+		# Compute the gradient of the objective function and cost and prediction
+		self.compute_cost_and_gradient = theano.function(inputs=[self.inputL, self.inputR, self.truth],
+														 outputs=self.gradparams+[self.cost, self.pred])
+		# Output function for debugging purpose
+		self.show_hidden = theano.function(inputs=[self.inputL, self.inputR], outputs=self.hidden)
+		self.show_compressed_hidden = theano.function(inputs=[self.inputL, self.inputR], outputs=self.compressed_hidden)
+		self.show_output = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
+		if verbose:
+			logger.debug('Architecture of BRNNMatcher built finished, summarized below: ')
+			logger.debug('Input dimension: %d' % config.num_input)
+			logger.debug('Hidden dimension of RNN: %d' % config.num_hidden)
+			logger.debug('Hidden dimension of MLP: %d' % config.num_mlp)
+			logger.debug('Number of parameters in the encoder part: %d' % self.num_params_encoder)
+			logger.debug('Number of parameters in the classifier: %d' % self.num_params_classifier)
+			logger.debug('Total number of parameters in this model: %d' % self.num_params)
 
+	def update_params(self, grads, learn_rate):
+		'''
+		@grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
+				They are the corresponding gradients of model parameters.
+		@learn_rate: scalar. Learning rate.
+		'''
+		for param, grad in zip(self.params, grads):
+			p = param.get_value(borrow=True)
+			param.set_value(p - learn_rate * grad, borrow=True)
 
+	@staticmethod
+	def save(fname, model):
+		'''
+		@fname: String. Filename to store the model.
+		@model: BRNNMatcher. An instance of BRNNMatcher to be saved.
+		'''
+		with file(fname, 'wb') as fout:
+			cPickle.dump(model, fout)
 
-
-
-
-
-
-
-
-
+	@staticmethod
+	def load(fname):
+		'''
+		@fname: String. Filename to load the model.
+		'''
+		with file(fname, 'rb') as fin:
+			model = cPickle.load(fin)
+		return model
 

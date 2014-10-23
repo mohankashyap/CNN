@@ -16,15 +16,23 @@ import unittest
 import csv
 import time
 import cPickle
-
+import logging
 from pprint import pprint
 
 from rnn import BRNN, TBRNN, RNN
 from config import RNNConfiger
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer
+from utils import floatX
 
 theano.config.openmp=True
+theano.config.on_unused_input='ignore'
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    datefmt='%m-%d %H:%M')
+logger = logging.getLogger(__name__)
+
 
 class TestRNNSP(unittest.TestCase):
     '''
@@ -53,8 +61,8 @@ class TestRNNSP(unittest.TestCase):
                 sp_test_txt.append(txt)
                 sp_test_label.append(label)
         end_time = time.time()
-        pprint('Finished loading training and test data sets...')
-        pprint('Time used for loading: %f seconds.' % (end_time-start_time))
+        logger.debug('Finished loading training and test data sets...')
+        logger.debug('Time used for loading: %f seconds.' % (end_time-start_time))
         embedding_filename = '../data/wiki_embeddings.txt'
         word_embedding = WordEmbedding(embedding_filename)
         start_time = time.time()
@@ -71,8 +79,8 @@ class TestRNNSP(unittest.TestCase):
         # Check size
         assert train_size == self.sp_train_label.shape[0]
         assert test_size == self.sp_test_label.shape[0]
-        pprint('Training size: %d' % train_size)
-        pprint('Test size: %d' % test_size)
+        logger.debug('Training size: %d' % train_size)
+        logger.debug('Test size: %d' % test_size)
         # Sequential modeling for each sentence
         self.sp_train_set, self.sp_test_set = [], []
         sp_train_len, sp_test_len = [], []
@@ -80,7 +88,7 @@ class TestRNNSP(unittest.TestCase):
         for i, sent in enumerate(sp_train_txt):
             words = sent.split()
             words = [word.lower() for word in words]
-            vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()))
+            vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()), dtype=floatX)
             vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
             sp_train_len.append(len(words)+2)
             self.sp_train_set.append(vectors)
@@ -88,20 +96,20 @@ class TestRNNSP(unittest.TestCase):
         for i, sent in enumerate(sp_test_txt):
             words = sent.split()
             words = [word.lower() for word in words]
-            vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()))
+            vectors = np.zeros((len(words)+2, word_embedding.embedding_dim()), dtype=floatX)
             vectors[1:-1, :] = np.asarray([word_embedding.wordvec(word) for word in words])
             sp_test_len.append(len(words)+2)
             self.sp_test_set.append(vectors)
         assert sp_train_len == [seq.shape[0] for seq in self.sp_train_set]
         assert sp_test_len == [seq.shape[0] for seq in self.sp_test_set]
         end_time = time.time()
-        pprint('Time used to build initial training and test matrix: %f seconds.' % (end_time-start_time))
+        logger.debug('Time used to build initial training and test matrix: %f seconds.' % (end_time-start_time))
         # Store data
         self.train_size = train_size
         self.test_size = test_size
         self.word_embedding = word_embedding
-        pprint('Max sentence length in training set: %d' % max(sp_train_len))
-        pprint('Max sentence length in test set: %d' % max(sp_test_len))
+        logger.debug('Max sentence length in training set: %d' % max(sp_train_len))
+        logger.debug('Max sentence length in test set: %d' % max(sp_test_len))
 
     def testTBRNN(self):
         # Set print precision
@@ -110,96 +118,71 @@ class TestRNNSP(unittest.TestCase):
         config_filename = './sp_brnn.conf'
         start_time = time.time()
         configer = RNNConfiger(config_filename)
-        brnn = TBRNN(configer, verbose=True)
+        brnn = BRNN(configer, verbose=True)
         end_time = time.time()
-        pprint('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
+        logger.debug('Time used to build TBRNN: %f seconds.' % (end_time-start_time))
         # Training
-        pprint('positive labels: %d' % np.sum(self.sp_train_label))
-        pprint('negative labels: %d' % (self.sp_train_label.shape[0]-np.sum(self.sp_train_label)))
+        logger.debug('positive labels: %d' % np.sum(self.sp_train_label))
+        logger.debug('negative labels: %d' % (self.sp_train_label.shape[0]-np.sum(self.sp_train_label)))
         start_time = time.time()
         ## AdaGrad learning algorithm instead of the stochastic gradient descent algorithm
         # history_grads = np.zeros(brnn.num_params)
-        n_epoch = 2000
+        n_epoch = 200
         learn_rate = 1e-1
-        # fudge_factor = 1e-6
+        batch_size = 100
+        fudge_factor = 1e-6
+        history_grads = np.zeros(brnn.num_params, dtype=floatX)
+        logger.debug('Number of parameters in the model: {}'.format(brnn.num_params))
         for i in xrange(n_epoch):
             tot_count = 0
             tot_error = 0.0
-            conf_matrix = np.zeros((2, 2), dtype=np.int32)
-            tot_grads = np.zeros(brnn.num_params)
-            pprint('Total number of parameters in TBRNN: %d' % brnn.num_params)
-            for train_seq, train_label in zip(self.sp_train_set, self.sp_train_label):
+            tot_grads = np.zeros(brnn.num_params, dtype=floatX)
+            for j, (train_seq, train_label) in enumerate(zip(self.sp_train_set, self.sp_train_label)):
+                if (j+1) % 1000 == 0:
+                    logger.debug('%4d @ %4d epoch' % (j+1, i))
                 cost, current_grads = brnn.compute_cost_and_gradient(train_seq, [train_label])
+                # Accumulate current gradients
                 tot_grads += current_grads
                 tot_error += cost
-                # historical gradient accumulation
-                # history_grads += current_grads ** 2
+                # Accumulate historical gradients
+                history_grads += np.square(current_grads)
                 # predict current training label
                 prediction = brnn.predict(train_seq)[0]
                 tot_count += prediction == train_label
-                conf_matrix[train_label, prediction] += 1
-            # Batch updating 
-            tot_grads /= self.train_size
-            rate = learn_rate / (i / 100 + 1)
-            brnn.update_params(tot_grads, rate)
-            # Update historical gradient vector
-            # adjusted_grads = tot_grads / (fudge_factor + np.sqrt(history_grads))
-            # brnn.update_params(adjusted_grads, learn_rate)
-            # End of the core AdaGrad updating algorithm
-            accuracy = tot_count / float(self.train_size)
-            pprint('Epoch %d, total cost: %f, overall accuracy: %f' % (i, tot_error, accuracy))
-            pprint('Confusion matrix: ')
-            pprint(conf_matrix)
-            pprint('-' * 50)
-            if (i+1) % 100 == 0:
-                pprint('=' * 50)
-                pprint('Test at epoch: %d' % i)
-                # Testing
-                tot_count = 0
-                for test_seq, test_label in zip(self.sp_test_set, self.sp_test_label):
-                    prediction = brnn.predict(test_seq)[0]
-                    tot_count += test_label == prediction
-                pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-                pprint('Percentage of positive in Test data: %f' % (np.sum(self.sp_test_label==1) / float(self.test_size)))
-                pprint('Percentage of negative in Test data: %f' % (np.sum(self.sp_test_label==0) / float(self.test_size)))
-                pprint('=' * 50)
+                # Batch updating with AdaGrad
+                if (j+1) % batch_size == 0 or j == self.train_size-1:
+                    # Adjust gradient for AdaGrad
+                    tot_grads /= batch_size
+                    tot_grads /= fudge_factor + np.sqrt(history_grads)
+                    brnn.update_params(tot_grads, learn_rate)
+                    tot_grads = np.zeros(brnn.num_params, dtype=floatX)
+                    history_grads = np.zeros(brnn.num_params, dtype=floatX)
+            logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, tot_error, tot_count / float(self.train_size)))
+            # Testing
+            tot_count = 0
+            for test_seq, test_label in zip(self.sp_test_set, self.sp_test_label):
+                prediction = brnn.predict(test_seq)[0]
+                tot_count += test_label == prediction
+            logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
         end_time = time.time()
-        pprint('Time used for training: %f minutes.' % ((end_time-start_time)/60))
+        logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
         # Testing
         tot_count = 0
         for test_seq, test_label in zip(self.sp_test_set, self.sp_test_label):
             prediction = brnn.predict(test_seq)[0]
             tot_count += test_label == prediction
-        pprint('Test accuracy: %f' % (tot_count / float(self.test_size)))
-        pprint('Percentage of positive in Test data: %f' % (np.sum(self.sp_test_label==1) / float(self.test_size)))
-        pprint('Percentage of negative in Test data: %f' % (np.sum(self.sp_test_label==0) / float(self.test_size)))
+        logger.debug('Test accuracy: %f' % (tot_count / float(self.test_size)))
+        logger.debug('Percentage of positive in Test data: %f' % (np.sum(self.sp_test_label==1) / float(self.test_size)))
+        logger.debug('Percentage of negative in Test data: %f' % (np.sum(self.sp_test_label==0) / float(self.test_size)))
         # Re-testing on training set
         tot_count = 0
         for train_seq, train_label in zip(self.sp_train_set, self.sp_train_label):
             prediction = brnn.predict(train_seq)[0]
             tot_count += train_label == prediction
-        pprint('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
-        # Show representation for training inputs and testing inputs
-        start_time = time.time()
-        training_forward_rep = np.zeros((self.train_size, configer.num_hidden))
-        test_forward_rep = np.zeros((self.test_size, configer.num_hidden))
-        training_backward_rep = np.zeros((self.train_size, configer.num_hidden))
-        test_backward_rep = np.zeros((self.test_size, configer.num_hidden))
-        for i, train_seq in enumerate(self.sp_train_set):
-            training_forward_rep[i, :] = brnn.show_forward(train_seq)
-            training_backward_rep[i, :] = brnn.show_backward(train_seq)
-        for i, test_seq in enumerate(self.sp_test_set):
-            test_forward_rep[i, :] = brnn.show_forward(test_seq)
-            test_backward_rep[i, :] = brnn.show_backward(test_seq)
-        end_time = time.time()
-        pprint('Time used to show forward and backward representation for training and test instances: %f seconds' % (end_time-start_time))
-        sio.savemat('./sp-TBRNN-rep.mat', {'training_forward' : training_forward_rep, 
-                                       'training_backward' : training_backward_rep, 
-                                       'test_forward' : test_forward_rep, 
-                                       'test_backward' : test_backward_rep})
+        logger.debug('Training accuracy re-testing: %f' % (tot_count / float(self.train_size)))
         # Save TBRNN
-        TBRNN.save('sp.tbrnn.pkl', brnn)
-        pprint('Model successfully saved...')
+        BRNN.save('sp.brnn.pkl', brnn)
+        logger.debug('Model successfully saved...')
 
 
 if __name__ == '__main__':

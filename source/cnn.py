@@ -48,6 +48,8 @@ class ConvNet(object):
 		assert configs.num_convpool == len(configs.pools)
 		assert configs.num_hidden == len(configs.hiddens)
 		assert configs.num_softmax == len(configs.softmaxs)
+		# Construct random number generator
+		srng = T.shared_randomstreams.RandomStreams(configs.random_seed)
 		# Build architecture of CNN
 		# Convolution and Pooling layers
 		image_shapes, filter_shapes = [], []
@@ -71,7 +73,11 @@ class ConvNet(object):
 		for i in xrange(configs.num_hidden):
 			if i == 0: current_input = T.flatten(self.convpool_layers[configs.num_convpool-1].output, 2)
 			else: current_input = self.hidden_layers[i-1].output
-			self.hidden_layers.append(HiddenLayer(current_input, configs.hiddens[i], act=self.act))
+			# Adding dropout to hidden layers
+			hidden_layer = HiddenLayer(current_input, configs.hiddens[i], act=self.act)
+			mask = srng.binomial(n=1, p=1-configs.dropout, size=hidden_layer.shape)
+			hidden_layer *= T.cast(mask, floatX)
+			self.hidden_layers.append(hidden_layer)
 		# Softmax Layer, for most case, the architecture will only contain one softmax layer
 		for i in xrange(configs.num_softmax):
 			if i == 0: current_input = self.hidden_layers[configs.num_hidden-1].output
