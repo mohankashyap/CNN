@@ -1,4 +1,17 @@
 data/*
 source/*.pyc
+source/*.pkl
+source/*.mat
+test/*.pkl
+test/*.mat
 test/*.pyc
+test/*.model
+test/*.png
+test/*.txt
+experiment/*.pkl
+experiment/*.mat
 experiment/*.pyc
+experiment/*.model
+experiment/*.txt
+records/
+
