@@ -370,6 +370,8 @@ try:
         score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
         score_p, score_n = score_p[0], score_n[0]
         if score_p >= score_n: correct_count += 1
+        # For debugging only
+        logger.debug('p-score = %f, n-score = %f' % (score_p, score_n))
         if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
