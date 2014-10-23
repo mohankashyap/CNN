@@ -318,6 +318,7 @@ try:
             # logger.debug('Batch cost = %f' % batch_cost)
             grcnn.update_params(total_grads, learn_rate)
         # Compute training error
+        assert len(total_predictions) == train_size
         total_predictions = np.asarray(total_predictions)
         total_count = np.sum(total_predictions)
         train_accuracy = total_count / float(train_size)
