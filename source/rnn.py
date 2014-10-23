@@ -18,7 +18,8 @@ import config
 import utils
 from utils import floatX
 from activations import Activation
-from logistic import SoftmaxLayer
+from logistic import SoftmaxLayer, LogisticLayer
+from mlp import HiddenLayer
 
 logger = logging.getLogger(__name__)
 

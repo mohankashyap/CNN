@@ -175,19 +175,9 @@ try:
             # hiddenP, hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
             # p_score, n_score = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
-            if len(grads) == 0:
-                grads, costs, preds = grad, cost, [score_p >= score_n]
-            else:
-                for gt, g in zip(grads, grad):
-                    gt += g
-                costs += cost
-                preds.append(score_p >= score_n)
-            # logger.debug('-' * 50)
-            # logger.debug('L2-norm of hiddenP and hiddenN: %f' % (np.sum((hiddenP-hiddenN) ** 2)))
-            # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
-        # Each element of results is a three-element tuple, where the first element
-        # accumulates the gradients, the second element accumulate the cost and the 
-        # third element store the predictions
+            grads.append(grad)
+            costs += cost
+            preds.append(score_p >= score_n)
         return grads, costs, preds
 
     for i in xrange(configer.nepoch):
@@ -248,21 +238,19 @@ try:
                 results = [result.get() for result in results]
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                
-                batch_cost = 0.0
+                # Map-Reduce
                 for result in results:
                     grad, cost, pred = result[0], result[1], result[2]
-                    for gt, g in zip(total_grads, grad):
-                        gt += g
-                    for gt, g in zip(hist_grads, grad):
-                        gt += np.square(g)
+                    for inst_grads in grad:
+                        for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
+                            tot_grad += inst_grad
+                            hist_grad += np.square(inst_grad)
                     total_cost += cost
-                    batch_cost += cost
                     total_predictions += pred
                 # AdaGrad updating
-                for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= batch_size
-                    grad /= fudge_factor + np.sqrt(hist_grad)
+                for tot_grad, hist_grad in zip(total_grads, hist_grads):
+                    tot_grad /= batch_size
+                    tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
@@ -275,23 +263,16 @@ try:
                     nj = train_neg_index[j]
                     n_sentR = train_pairs_set[j][1]
                     r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                    hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
-                    grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
-                    batch_cost = 0.0
-                    for gt, g in zip(total_grads, grad):
-                        gt += g
-                    for gt, g in zip(hist_grads, grad):
-                        gt += np.square(g)
+                    inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
+                    for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
+                        tot_grad += inst_grad
+                        hist_grad += np.square(inst_grad)
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
-                    # logger.debug('-' * 50)
-                    # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
-                    # logger.debug('HiddenL: {}'.format(hiddenL))
-                    # logger.debug('HiddenR: {}'.format(hiddenR))
                     # AdaGrad updating
-                for grad, hist_grad in zip(total_grads, hist_grads):
-                    grad /= train_size - num_batch*batch_size
-                    grad /= fudge_factor + np.sqrt(hist_grad)
+                for tot_grad, hist_grad in zip(total_grads, hist_grads):
+                    tot_grad /= train_size - num_batch*batch_size
+                    tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
         # Compute training error
@@ -314,7 +295,6 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
             if score_p >= score_n: correct_count += 1
-            #logger.debug('p-score = %f, n-score = %f' % (score_p, score_n))
         test_accuracy = correct_count / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
         logger.debug('Test total cost: %f' % total_cost)
@@ -337,8 +317,6 @@ try:
         score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
         score_p, score_n = score_p[0], score_n[0]
         if score_p >= score_n: correct_count += 1
-        # For debugging only
-        # logger.debug('p-score = %f, n-score = %f' % (score_p, score_n))
         if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
