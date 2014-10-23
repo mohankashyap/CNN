@@ -278,6 +278,7 @@ try:
                 # logger.debug('Batch cost = %f' % batch_cost)
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
+            logger.debug('There are %d instances left to be processed sequentially.' % (train_size-num_batch*batch_size))
             for j in xrange(num_batch * batch_size, train_size):
                 sentL, p_sentR = train_pairs_set[j]
                 nj = train_neg_index[j]
