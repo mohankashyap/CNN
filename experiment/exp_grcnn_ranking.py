@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-#matching_train_filename = '../data/pair_all_sentence_train.txt'
-#matching_test_filename = '../data/pair_sentence_test.txt'
-matching_train_filename = '../data/small_pair_train.txt'
-matching_test_filename = '../data/small_pair_test.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
+# matching_train_filename = '../data/small_pair_train.txt'
+# matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -293,6 +293,7 @@ try:
         total_count = np.sum(total_predictions)
         train_accuracy = total_count / float(train_size)
         # logger.debug('-' * 50)
+        logger.debug('Total count = {}'.format(total_count))
         logger.debug('Total prediction = {}'.format(total_predictions))
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
@@ -328,6 +329,7 @@ try:
                 test_predictions.append(score_p >= score_n)
         test_predictions = np.asarray(test_predictions)
         test_accuracy = np.sum(test_predictions) / float(test_size)
+        logger.debug('Total test predictions: {}'.format(test_predictions))
         logger.debug('Test accuracy: %f' % test_accuracy)
         logger.debug('Test total cost: %f' % test_costs)
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
