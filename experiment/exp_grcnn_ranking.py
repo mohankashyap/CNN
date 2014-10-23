@@ -57,8 +57,8 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-#matching_train_filename = '../data/pair_all_sentence_train.txt'
-#matching_test_filename = '../data/pair_sentence_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
 matching_train_filename = '../data/small_pair_train.txt'
 matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
@@ -222,7 +222,7 @@ try:
                 if (j+1) % batch_size == 0 or j == len(train_instances)-1:
                     # AdaGrad updating
                     for grad, hist_grad in zip(total_grads, hist_grads):
-                        # grad /= batch_size
+                        grad /= batch_size
                         grad /= fudge_factor + np.sqrt(hist_grad)
                     # Check total grads
                     grcnn.update_params(total_grads, learn_rate)
@@ -261,7 +261,7 @@ try:
                     total_predictions += pred
                 # AdaGrad updating
                 for grad, hist_grad in zip(total_grads, hist_grads):
-                    # grad /= batch_size
+                    grad /= batch_size
                     grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
@@ -302,7 +302,7 @@ try:
                 # logger.debug('HiddenR: {}'.format(hiddenR))
                 # AdaGrad updating
             for grad, hist_grad in zip(total_grads, hist_grads):
-                # grad /= train_size - num_batch*batch_size
+                grad /= train_size - num_batch*batch_size
                 grad /= fudge_factor + np.sqrt(hist_grad)
             # Compute the norm of gradients 
             grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
@@ -337,7 +337,7 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p-score_n <= 1.0: total_cost += 1-score_p+score_n
             if score_p >= score_n: correct_count += 1
-            # logger.debug('p-score = %f, n-score = %f' % (score_p, score_n))
+            logger.debug('p-score = %f, n-score = %f' % (score_p, score_n))
         test_accuracy = correct_count / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
         logger.debug('Test total cost: %f' % total_cost)
