@@ -487,7 +487,7 @@ class GrCNNMatchScorer(object):
             logger.debug('There are 2 GrCNNEncoders used in model.')
             logger.debug('Total number of parameters used in the model: %d' % self.num_params)
 
-    def update_params(self, grads, learn_rate):
+   def update_params(self, grads, learn_rate):
         '''
         @grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
         @learn_rate: scalar. Learning rate.
