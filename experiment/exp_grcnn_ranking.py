@@ -264,60 +264,36 @@ try:
                     grad /= batch_size
                     grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
-                grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
-                param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
-                param_names = [param.name for param in grcnn.params]                
-                # logger.debug('#' * 50)
-                # logger.debug('%8d batch @ %4d epoch' % (j, i))
-                # logger.debug('Name of parameters: ')
-                # logger.debug(param_names)
-                # logger.debug('Gradient norms of parameters: ')
-                # logger.debug(grad_norms)
-                # logger.debug('Norms of the parameters: ')
-                # logger.debug(param_norms)
-                # logger.debug('Batch cost = %f' % batch_cost)
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
-            logger.debug('There are %d instances left to be processed sequentially.' % (train_size-num_batch*batch_size))
-            for j in xrange(num_batch * batch_size, train_size):
-                sentL, p_sentR = train_pairs_set[j]
-                nj = train_neg_index[j]
-                n_sentR = train_pairs_set[j][1]
-                r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
-                grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
+            if num_batch * batch_size < train_size:
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-
-                batch_cost = 0.0
-                for gt, g in zip(total_grads, grad):
-                    gt += g
-                for gt, g in zip(hist_grads, grad):
-                    gt += np.square(g)
-                total_cost += cost
-                total_predictions.append(score_p >= score_n)
-                # logger.debug('-' * 50)
-                # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
-                # logger.debug('HiddenL: {}'.format(hiddenL))
-                # logger.debug('HiddenR: {}'.format(hiddenR))
-                # AdaGrad updating
-            for grad, hist_grad in zip(total_grads, hist_grads):
-                grad /= train_size - num_batch*batch_size
-                grad /= fudge_factor + np.sqrt(hist_grad)
-            # Compute the norm of gradients 
-            grad_norms = [np.sqrt(np.sum(np.square(grad))) for grad in total_grads]
-            param_norms = [np.sqrt(np.sum(np.square(param.get_value(borrow=True)))) for param in grcnn.params]
-            param_names = [param.name for param in grcnn.params]                
-            # logger.debug('#' * 50)
-            # logger.debug('Name of parameters: ')
-            # logger.debug(param_names)
-            # logger.debug('Gradient norms of parameters: ')
-            # logger.debug(grad_norms)
-            # logger.debug('Norms of the parameters: ')
-            # logger.debug(param_norms)
-            # logger.debug('Batch cost = %f' % batch_cost)
-            grcnn.update_params(total_grads, learn_rate)
+                for j in xrange(num_batch * batch_size, train_size):
+                    sentL, p_sentR = train_pairs_set[j]
+                    nj = train_neg_index[j]
+                    n_sentR = train_pairs_set[j][1]
+                    r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
+                    hiddenL, hiddenR = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
+                    grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
+                    batch_cost = 0.0
+                    for gt, g in zip(total_grads, grad):
+                        gt += g
+                    for gt, g in zip(hist_grads, grad):
+                        gt += np.square(g)
+                    total_cost += cost
+                    total_predictions.append(score_p >= score_n)
+                    # logger.debug('-' * 50)
+                    # logger.debug('p-score = {}, n-score = {}'.format(score_p, score_n))
+                    # logger.debug('HiddenL: {}'.format(hiddenL))
+                    # logger.debug('HiddenR: {}'.format(hiddenR))
+                    # AdaGrad updating
+                for grad, hist_grad in zip(total_grads, hist_grads):
+                    grad /= train_size - num_batch*batch_size
+                    grad /= fudge_factor + np.sqrt(hist_grad)
+                # Compute the norm of gradients 
+                grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         assert len(total_predictions) == train_size
         total_predictions = np.asarray(total_predictions)
@@ -344,7 +320,7 @@ try:
         logger.debug('Test total cost: %f' % total_cost)
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
         # Save the model
-        logger.debug('Save current model...')
+        logger.debug('Save current model and parameters...')
         params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
         sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
         GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
@@ -378,7 +354,7 @@ except:
         pool.terminate()
     traceback.print_exc(file=sys.stdout)
 finally:            
-    logger.debug('Saving model parameters...')
+    logger.debug('Saving existing model and parameters...')
     params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
     sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
