@@ -148,13 +148,13 @@ class MLPRanker(object):
         self.hiddenP = self.hidden_layer.encode(self.inputP)
         self.hiddenN = self.hidden_layer.encode(self.inputN)
         # Dropout parameter
-        srng = T.shared_randomstreams.RandomStreams(args.seed)
-        mask = srng.binomial(n=1, p=1-args.dropout, size=self.hidden.shape)
-        maskP = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenP.shape)
-        maskN = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenN.shape)
-        self.hidden *= T.cast(mask, floatX)
-        self.hiddenP *= T.cast(maskP, floatX)
-        self.hiddenN *= T.cast(maskN, floatX)
+        #srng = T.shared_randomstreams.RandomStreams(args.seed)
+        #mask = srng.binomial(n=1, p=1-args.dropout, size=self.hidden.shape)
+        #maskP = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenP.shape)
+        #maskN = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenN.shape)
+        #self.hidden *= T.cast(mask, floatX)
+        #self.hiddenP *= T.cast(maskP, floatX)
+        #self.hiddenN *= T.cast(maskN, floatX)
         # Build linear output layer
         self.score_layer = ScoreLayer(self.hidden, args.hidden)
         self.output = self.score_layer.output
