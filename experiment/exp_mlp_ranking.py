@@ -333,4 +333,4 @@ finally:
     params = {param.name : param.get_value(borrow=True) for param in ranker.params}
     sio.savemat('rankerMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: rankerMatchRanker-{}.pkl.'.format(args.name))
-    rankerMatcher.save('rankerMatchRanker-{}.pkl'.format(args.name), ranker)
+    MLPMatcher.save('rankerMatchRanker-{}.pkl'.format(args.name), ranker)
