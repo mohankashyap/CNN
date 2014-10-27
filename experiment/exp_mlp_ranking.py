@@ -51,9 +51,13 @@ parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
                     type=float, default=1.0)
 parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
+parser.add_argument('-p', '--dropout', help='Dropout parameter.', 
+                    type=float, default=0.5)
+parser.add_argument('-r', '--seed', help='Random seed.',
+                    type=int, default=42)
 args = parser.parse_args()
 
-np.random.seed(42)
+np.random.seed(args.seed)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
 matching_test_filename = '../data/pair_sentence_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
@@ -143,6 +147,14 @@ class MLPRanker(object):
         self.hidden = self.hidden_layer.output
         self.hiddenP = self.hidden_layer.encode(self.inputP)
         self.hiddenN = self.hidden_layer.encode(self.inputN)
+        # Dropout parameter
+        srng = T.shared_randomstreams.RandomStreams(args.seed)
+        mask = srng.binomial(n=1, p=1-args.dropout, size=self.hidden.shape)
+        maskP = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenP.shape)
+        maskN = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenN.shape)
+        self.hidden *= T.cast(mask, floatX)
+        self.hiddenP *= T.cast(maskP, floatX)
+        self.hiddenN *= T.cast(maskN, floatX)
         # Build linear output layer
         self.score_layer = ScoreLayer(self.hidden, args.hidden)
         self.output = self.score_layer.output
@@ -265,7 +277,7 @@ try:
             for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
                 tot_grad += inst_grad
                 hist_grad += np.square(inst_grad)
-            total_cost += np.sum(costs)
+            total_cost += np.sum(costs) * batch_size
             total_count += np.sum(score_p >= score_n)
             # AdaGrad updating
             for tot_grad, hist_grad in zip(total_grads, hist_grads):
@@ -283,7 +295,7 @@ try:
             for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
                 tot_grad += inst_grad
                 hist_grad += np.square(inst_grad)
-            total_cost += np.sum(costs)
+            total_cost += np.sum(costs) * (train_size-num_batch*batch_size)
             total_count += np.sum(score_p >= score_n)
             # AdaGrad updating
             for tot_grad, hist_grad in zip(total_grads, hist_grads):
@@ -314,7 +326,9 @@ try:
     start_time = time.time()
     test_cost, total_count = 0.0, 0
     score_p, score_n = ranker.show_scores(testL, testR, testL, testNR)
-    total_cost += np.sum(np.max(0.0, 1-score_p+score_n))
+    tmp_cost = 1-score_p+score_n
+    tmp_cost[tmp_cost <= 0.0] = 0.0
+    total_cost += np.sum(tmp_cost)
     total_count += np.sum(score_p >= score_n)
     test_accuracy = total_count / float(test_size)
     end_time = time.time()
