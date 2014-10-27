@@ -257,7 +257,6 @@ try:
             if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in ranker.params]
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in ranker.params]
-            logger.debug('trainNR.shape: {}'.format(trainNR[j*batch_size : (j+1)*batch_size].shape))
             r = ranker.compute_cost_and_gradient(trainL[j*batch_size : (j+1)*batch_size], 
                                                  trainR[j*batch_size : (j+1)*batch_size],
                                                  trainL[j*batch_size : (j+1)*batch_size],
@@ -298,7 +297,7 @@ try:
         # Testing after each training epoch
         total_cost, total_count = 0.0, 0        
         score_p, score_n = ranker.show_scores(testL, testR, testL, testNR)
-        total_cost += np.sum(np.max(np.zeros(test_size), 1-score_p+score_n))
+        total_cost += np.sum(np.max(np.zeros((test_size, 1), dtype=floatX), 1-score_p+score_n))
         total_count += np.sum(score_p >= score_n)
         test_accuracy = total_count / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
