@@ -297,7 +297,7 @@ try:
         # Testing after each training epoch
         total_cost, total_count = 0.0, 0        
         score_p, score_n = ranker.show_scores(testL, testR, testL, testNR)
-        tmp_cost = 1-scope_p+score_n
+        tmp_cost = 1-score_p+score_n
         tmp_cost[tmp_cost <= 0.0] = 0.0
         total_cost += np.sum(tmp_cost)
         total_count += np.sum(score_p >= score_n)
