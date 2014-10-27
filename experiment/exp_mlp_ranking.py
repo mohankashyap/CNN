@@ -139,7 +139,7 @@ class MLPRanker(object):
         self.inputN = T.concatenate([self.inputNL, self.inputNR], axis=1)
         self.input = T.concatenate([self.inputL, self.inputR], axis=1)
         # Build hidden layer
-        self.hidden_layer = HiddenLayer(self.input, (edim, args.hidden), act=self.act)
+        self.hidden_layer = HiddenLayer(self.input, (2*edim, args.hidden), act=self.act)
         self.hidden = self.hidden_layer.output
         self.hiddenP = self.hidden_layer.encode(self.inputP)
         self.hiddenN = self.hidden_layer.encode(self.inputN)
@@ -333,4 +333,4 @@ finally:
     params = {param.name : param.get_value(borrow=True) for param in ranker.params}
     sio.savemat('rankerMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: rankerMatchRanker-{}.pkl.'.format(args.name))
-    MLPMatcher.save('rankerMatchRanker-{}.pkl'.format(args.name), ranker)
+    MLPRanker.save('rankerMatchRanker-{}.pkl'.format(args.name), ranker)
