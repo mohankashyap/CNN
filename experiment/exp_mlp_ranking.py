@@ -137,7 +137,7 @@ class MLPRanker(object):
         self.inputL = T.matrix(name='inputL', dtype=floatX)
         self.inputR = T.matrix(name='inputR', dtype=floatX)
         # Build activation function
-        self.act = Activation('ReLU')
+        self.act = Activation('tanh')
         # Connect input matrices
         self.inputP = T.concatenate([self.inputPL, self.inputPR], axis=1)
         self.inputN = T.concatenate([self.inputNL, self.inputNR], axis=1)
@@ -266,7 +266,6 @@ try:
         logger.debug('Total number of batches: %d' % num_batch)
         # Using GPU computation
         for j in xrange(num_batch):
-            if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in ranker.params]
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in ranker.params]
             r = ranker.compute_cost_and_gradient(trainL[j*batch_size : (j+1)*batch_size], 
