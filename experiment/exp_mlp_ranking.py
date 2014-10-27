@@ -272,7 +272,7 @@ try:
             for tot_grad, hist_grad in zip(total_grads, hist_grads):
                 tot_grad /= batch_size
                 tot_grad /= fudge_factor + np.sqrt(hist_grad)
-            ranker.update_params(tot_grads, learn_rate)
+            ranker.update_params(total_grads, learn_rate)
         # Final updating on the result of training instances
         if num_batch * batch_size < train_size:
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in ranker.params]
@@ -291,7 +291,7 @@ try:
             for tot_grad, hist_grad in zip(total_grads, hist_grads):
                 tot_grad /= train_size - num_batch*batch_size
                 tot_grad /= fudge_factor + np.sqrt(hist_grad)
-            ranker.update_params(tot_grads, learn_rate)
+            ranker.update_params(total_grads, learn_rate)
         # Compute training error
         train_accuracy = total_count / float(train_size)
         # Reporting after each training epoch
