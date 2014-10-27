@@ -153,7 +153,7 @@ class MLPRanker(object):
         self.params += self.hidden_layer.params
         self.params += self.score_layer.params
         # Build cost function
-        self.cost = T.mean(T.maximum(0.0, 1.0-self.scoreP+self.scoreN))
+        self.cost = T.mean(T.maximum(np.zeros(self.scoreP.shape[0]), 1.0-self.scoreP+self.scoreN))
         # Construct the gradient of the cost function with respect to the model parameters
         self.gradparams = T.grad(self.cost, self.params)
         # Count the total number of parameters in this model
