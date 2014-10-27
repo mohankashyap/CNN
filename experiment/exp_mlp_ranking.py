@@ -153,7 +153,7 @@ class MLPRanker(object):
         self.params += self.hidden_layer.params
         self.params += self.score_layer.params
         # Build cost function
-        self.cost = T.mean(T.maximum(np.zeros(self.scoreP.shape[0]), 1.0-self.scoreP+self.scoreN))
+        self.cost = T.mean(T.maximum(T.zeros_like(self.scoreP), 1.0-self.scoreP+self.scoreN))
         # Construct the gradient of the cost function with respect to the model parameters
         self.gradparams = T.grad(self.cost, self.params)
         # Count the total number of parameters in this model
@@ -270,7 +270,6 @@ try:
             total_count += np.sum(score_p >= score_n)
             # AdaGrad updating
             for tot_grad, hist_grad in zip(total_grads, hist_grads):
-                tot_grad /= batch_size
                 tot_grad /= fudge_factor + np.sqrt(hist_grad)
             ranker.update_params(total_grads, learn_rate)
         # Final updating on the result of training instances
@@ -289,7 +288,6 @@ try:
             total_count += np.sum(score_p >= score_n)
             # AdaGrad updating
             for tot_grad, hist_grad in zip(total_grads, hist_grads):
-                tot_grad /= train_size - num_batch*batch_size
                 tot_grad /= fudge_factor + np.sqrt(hist_grad)
             ranker.update_params(total_grads, learn_rate)
         # Compute training error
