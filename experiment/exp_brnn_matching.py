@@ -25,7 +25,7 @@ from pprint import pprint
 
 sys.path.append('../source/')
 
-from rnn import BRNN, TBRNN, RNN, BRNNMatcher
+from rnn import BRNN, RNN, BRNNMatcher
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer, LogisticLayer
 from utils import floatX
@@ -120,7 +120,6 @@ for i, (psent, qsent) in enumerate(test_pairs_txt):
 end_time = time.time()
 logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
-
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
 config_filename = './brnn_matching.conf'
@@ -183,10 +182,15 @@ try:
                     gt += g
                 costs += cost
                 preds.append(pred[0])
-        # Each element of results is a three-element tuple, where the first element
-        # accumulates the gradients, the second element accumulate the cost and the 
-        # third element store the predictions
         return grads, costs, preds
+
+    # Multi-processes for batch testing
+    def parallel_predict(start_idx, end_idx):
+        preds = []
+        for (sentL, sentR), label in test_instances[start_idx: end_idx]:
+            plabel = brnn.predict(sentL, sentR)[0]
+            preds.append(plabel)
+        return preds
 
     for i in xrange(configer.nepoch):
         # Looper over training instances
@@ -205,19 +209,18 @@ try:
                 if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
                 (sentL, sentR), label = train_instances[j]
                 r = brnn.compute_cost_and_gradient(sentL, sentR, [label]) 
-                grad, cost, pred = r[:-2], r[-2], r[-1]
+                inst_grads, cost, pred = r[:-2], r[-2], r[-1]
                 # Accumulate results
-                for gt, g in zip(total_grads, grad):
-                    gt += g
-                for gt, g in zip(hist_grads, grad):
-                    gt += np.square(g)
+                for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
+                    tot_grad += inst_grad
+                    hist_grad += np.square(inst_grad)
                 total_cost += cost
                 total_predictions.append(pred[0])
                 if (j+1) % batch_size == 0 or j == len(train_instances)-1:
                     # AdaGrad updating
-                    for grad, hist_grad in zip(total_grads, hist_grads):
-                        grad /= batch_size
-                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    for tot_grad, hist_grad in zip(total_grads, hist_grads):
+                        tot_grad /= batch_size
+                        tot_grad /= fudge_factor + np.sqrt(hist_grad)
                     brnn.update_params(total_grads, learn_rate)
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
                     hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
@@ -303,11 +306,11 @@ try:
     logger.debug('Test accuracy: %f' % (correct_count / float(len(test_index))))
 except:
     logger.debug('!!!Error!!!')
+    traceback.print_exc(file=sys.stdout)
     logger.debug('-' * 60)
     if args.cpu and pool != None:
         logger.debug('Quiting all subprocesses...')
         pool.terminate()
-    traceback.print_exc(file=sys.stdout)
 finally:            
     logger.debug('Saving the model: brnnMatcher-{}.pkl.'.format(args.name))
     BRNNMatcher.save('brnnMatcher-{}.pkl'.format(args.name), brnn)
