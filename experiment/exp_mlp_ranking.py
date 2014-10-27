@@ -52,7 +52,7 @@ parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
 parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
 parser.add_argument('-p', '--dropout', help='Dropout parameter.', 
-                    type=float, default=0.5)
+                    type=float, default=0.0)
 parser.add_argument('-r', '--seed', help='Random seed.',
                     type=int, default=42)
 args = parser.parse_args()
