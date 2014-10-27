@@ -298,7 +298,7 @@ try:
         # Testing after each training epoch
         total_cost, total_count = 0.0, 0        
         score_p, score_n = ranker.show_scores(testL, testR, testL, testNR)
-        total_cost += np.sum(np.max(0.0, 1-score_p+score_n))
+        total_cost += np.sum(np.max(np.zeros(test_size), 1-score_p+score_n))
         total_count += np.sum(score_p >= score_n)
         test_accuracy = total_count / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
