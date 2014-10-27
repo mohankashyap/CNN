@@ -137,7 +137,7 @@ class MLPRanker(object):
         self.inputL = T.matrix(name='inputL', dtype=floatX)
         self.inputR = T.matrix(name='inputR', dtype=floatX)
         # Build activation function
-        self.act = Activation('tanh')
+        self.act = Activation('ReLU')
         # Connect input matrices
         self.inputP = T.concatenate([self.inputPL, self.inputPR], axis=1)
         self.inputN = T.concatenate([self.inputNL, self.inputNR], axis=1)
@@ -334,7 +334,7 @@ try:
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % test_accuracy)
-    logger.debug('Test total cost: %f' % test_costs)
+    logger.debug('Test total cost: %f' % total_cost)
     logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
     logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:
