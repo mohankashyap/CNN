@@ -26,6 +26,7 @@ sys.path.append('../source/')
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer, LogisticLayer
 from mlp import HiddenLayer
+from score import ScoreLayer
 from activations import Activation
 from utils import floatX
 
@@ -156,10 +157,9 @@ class MLPRanker(object):
         # Construct the gradient of the cost function with respect to the model parameters
         self.gradparams = T.grad(self.cost, self.params)
         # Count the total number of parameters in this model
-        self.num_params = edim * args.hidden + self.hidden + \
-                          self.hidden + 1
+        self.num_params = edim * args.hidden + args.hidden + args.hidden + 1
         # Build class method
-        self.score = theano.function(inupts=[self.inputL, self.inputR], outputs=self.output)
+        self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
         self.compute_cost_and_gradient = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
                                                          outputs=self.gradparams+[self.cost, self.scoreP, self.scoreN])
         self.show_scores = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR], 
@@ -235,7 +235,7 @@ for i in xrange(train_size):
 
 for i in xrange(test_size):
     testL[i, :] = np.mean(test_pairs_set[i][0], axis=0)
-    testR[i, :] = np.mean(test_pairs_set[i][1], axis=1)
+    testR[i, :] = np.mean(test_pairs_set[i][1], axis=0)
     ni = test_neg_index[i]
     testNR[i, :] = np.mean(test_pairs_set[ni][1], axis=0)
 end_time = time.time()
