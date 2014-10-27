@@ -26,6 +26,7 @@ sys.path.append('../source/')
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer, LogisticLayer
 from mlp import HiddenLayer
+from score import ScoreLayer
 from activations import Activation
 from utils import floatX
 
