@@ -292,6 +292,7 @@ try:
         train_accuracy = total_count / float(train_size)
         # logger.debug('-' * 50)
         logger.debug('Total count = {}'.format(total_count))
+        logger.debug('Total predictions = {}'.format(total_predictions))
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
         if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
