@@ -191,7 +191,6 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
-            logger.debug('Instance %d in test data set, score-p: %f, score-n: %f' % (j, score_p, score_n))
         return costs, preds
 
     for i in xrange(configer.nepoch):
@@ -264,6 +263,8 @@ try:
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
+                logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, 
+                                    np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
