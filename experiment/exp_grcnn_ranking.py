@@ -327,7 +327,6 @@ try:
                 test_predictions.append(score_p >= score_n)
         test_predictions = np.asarray(test_predictions)
         test_accuracy = np.sum(test_predictions) / float(test_size)
-        logger.debug('Total test predictions: {}'.format(test_predictions))
         logger.debug('Test accuracy: %f' % test_accuracy)
         logger.debug('Test total cost: %f' % test_costs)
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
