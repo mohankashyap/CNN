@@ -448,7 +448,7 @@ class GrCNNMatchScorer(object):
         # Score layers
         self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp)
         # Reset the weights of the score layer
-        self.score_layer.W.set_value(np.asarray(np.random.uniform(low=-1.0, high=1.0, size=config.num_mlp),
+        self.score_layer.W.set_value(np.asarray(np.random.uniform(low=-1.0, high=1.0, size=(config.num_mlp, 1)),
                             dtype=floatX))
         self.output = self.score_layer.output
         self.scoreP = self.score_layer.encode(self.compressed_hiddenP)
