@@ -25,7 +25,7 @@ from pprint import pprint
 
 sys.path.append('../source/')
 
-from rnn import BRNN, TBRNN, RNN
+from rnn import BRNN, RNN
 from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchScorer
 from wordvec import WordEmbedding
 from logistic import SoftmaxLayer, LogisticLayer
