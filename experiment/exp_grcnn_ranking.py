@@ -203,6 +203,40 @@ try:
         num_batch = train_size / batch_size
         logger.debug('Batch size = %d' % batch_size)
         logger.debug('Total number of batches: %d' % num_batch)
+        # Testing after each training epoch
+        t_num_batch = test_size / batch_size
+        test_costs, test_predictions = 0.0, []
+        for j in xrange(t_num_batch):
+            start_idx = j * batch_size
+            step = batch_size / num_processes
+            # Creating Process Pool
+            pool = Pool(num_processes)
+            results = []
+            for k in xrange(num_processes):
+                results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+                start_idx += step
+            pool.close()
+            pool.join()
+            # Accumulate results
+            results = [result.get() for result in results]
+            # Map-Reduce
+            for result in results:
+                test_costs += result[0]
+                test_predictions += result[1]
+        if t_num_batch * batch_size < test_size:
+            for j in xrange(t_num_batch * batch_size, test_size):
+                sentL, p_sentR = test_pairs_set[j]
+                nj = test_neg_index[j]
+                n_sentR = test_pairs_set[nj][1]
+                score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                score_p, score_n = score_p[0], score_n[0]
+                if score_p < 1+score_n: test_costs += 1-score_p+score_n
+                test_predictions.append(score_p >= score_n)
+        test_predictions = np.asarray(test_predictions)
+        test_accuracy = np.sum(test_predictions) / float(test_size)
+        logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
+        logger.debug('Test total cost using initial model before nay training on whole training set: %f' % test_costs)
+
         if args.gpu:
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
