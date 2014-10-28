@@ -191,6 +191,7 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
+            logger.debug('Instance %d in test data set, score-p: %f, score-n: %f' % (j, score_p, score_n))
         return costs, preds
 
     # for i in xrange(configer.nepoch):
