@@ -56,12 +56,12 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 
 args = parser.parse_args()
 
-np.random.seed(42)
-# matching_train_filename = '../data/pair_all_sentence_train.txt'
-# matching_test_filename = '../data/pair_sentence_test.txt'
-matching_train_filename = '../data/small_pair_train.txt'
-# matching_test_filename = '../data/small_pair_test.txt'
-matching_test_filename = '../data/small_pair_test_new.txt'
+np.random.seed(1991)
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
+#matching_train_filename = '../data/small_pair_train.txt'
+#matching_test_filename = '../data/small_pair_test.txt'
+#matching_test_filename = '../data/small_pair_test_new.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -342,6 +342,7 @@ try:
     # Final total test
     start_time = time.time()
     t_num_batch = test_size / batch_size
+    logger.debug('Number of test batches: %d' % t_num_batch)
     test_costs, test_predictions = 0.0, []
     for j in xrange(t_num_batch):
         start_idx = j * batch_size
@@ -361,6 +362,7 @@ try:
             test_costs += result[0]
             test_predictions += result[1]
     if t_num_batch * batch_size < test_size:
+        logger.debug('The rest of the test instances are processed sequentially...')
         for j in xrange(t_num_batch * batch_size, test_size):
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
@@ -369,7 +371,9 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: test_costs += 1-score_p+score_n
             test_predictions.append(score_p >= score_n)
+    logger.debug('Length of test predictions: %d' % len(test_predictions))
     test_predictions = np.asarray(test_predictions)
+    logger.debug('Total test predictions = {}'.format(test_predictions))
     test_accuracy = np.sum(test_predictions) / float(test_size)
     end_time = time.time()
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
