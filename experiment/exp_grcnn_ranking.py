@@ -239,6 +239,7 @@ try:
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
+                results = []
                 for k in xrange(num_processes):
                     results.append(pool.apply_async(parallel_process, args=(start_idx, start_idx+step)))
                     start_idx += step
@@ -304,6 +305,7 @@ try:
             step = batch_size / num_processes
             # Creating Process Pool
             pool = Pool(num_processes)
+            results = []
             for k in xrange(num_processes):
                 results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
                 start_idx += step
