@@ -456,7 +456,7 @@ class GrCNNMatchScorer(object):
         # Accumulate parameters
         self.params += self.score_layer.params
         # Build cost function
-        self.cost = T.mean(T.maximum(0, 1.0 - self.scoreP + self.scoreN))
+        self.cost = T.mean(T.maximum(T.zeros_like(self.scoreP), 1.0 - self.scoreP + self.scoreN))
         # Construct the gradient of the cost function with respect to the model parameters
         self.gradparams = T.grad(self.cost, self.params)
         # Compute the total number of parameters in the model
