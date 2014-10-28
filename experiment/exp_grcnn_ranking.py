@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(42)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
-# matching_train_filename = '../data/small_pair_train.txt'
-# matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/small_pair_train.txt'
+matching_test_filename = '../data/small_pair_test.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -144,7 +144,6 @@ highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 # Check parameter size
 for param in hist_grads:
     logger.debug('Parameter Shape: {}'.format(param.shape))
-
 # Fixing training and test pairs
 start_time = time.time()
 train_neg_index = range(train_size)
@@ -240,7 +239,6 @@ try:
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
-                results = []
                 for k in xrange(num_processes):
                     results.append(pool.apply_async(parallel_process, args=(start_idx, start_idx+step)))
                     start_idx += step
@@ -294,7 +292,6 @@ try:
         train_accuracy = total_count / float(train_size)
         # logger.debug('-' * 50)
         logger.debug('Total count = {}'.format(total_count))
-        logger.debug('Total prediction = {}'.format(total_predictions))
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
         if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
@@ -306,7 +303,6 @@ try:
             step = batch_size / num_processes
             # Creating Process Pool
             pool = Pool(num_processes)
-            results = []
             for k in xrange(num_processes):
                 results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
                 start_idx += step
