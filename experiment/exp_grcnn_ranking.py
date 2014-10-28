@@ -162,7 +162,7 @@ train_neg_index = map(train_rand, train_neg_index)
 test_neg_index = map(test_rand, test_neg_index)
 end_time = time.time()
 logger.debug('Time used to generate negative training and test pairs: %f seconds.' % (end_time-start_time))
-
+num_processes = args.cpu
 try: 
     start_time = time.time()
     # Multi-processes for batch learning
@@ -232,7 +232,6 @@ try:
     #                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
     #                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
     #     else:
-    #         num_processes = args.cpu
     #         # Using Parallel CPU computation
     #         # Parallel computing inside each batch
     #         for j in xrange(num_batch):
