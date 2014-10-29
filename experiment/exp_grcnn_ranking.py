@@ -73,7 +73,6 @@ with file(matching_test_filename, 'r') as fin:
     for line in fin:
         p, q = line.split('|||')
         test_pairs_txt.append((p, q))
-
 end_time = time.time()
 logger.debug('Finished loading training and test data set...')
 logger.debug('Time used to load training and test pairs: %f seconds.' % (end_time-start_time))
@@ -128,8 +127,8 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './grCNN_ranker.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
-grcnn = GrCNNMatchScorer(configer, verbose=True)
-# grcnn = GrCNNMatchScorer.load('./GrCNNMatchRanker-RANK-GOOD.pkl')
+# grcnn = GrCNNMatchScorer(configer, verbose=True)
+grcnn = GrCNNMatchScorer.load('./GrCNNMatchRanker-RANK-GOOD.pkl')
 end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
@@ -298,25 +297,11 @@ try:
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
-
-                logger.debug('*' * 50)
-                logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
-                # AdaGrad updating
-                # prev_params = [param.get_value(borrow=True) for param in grcnn.params]
-                # prev_norms = [np.sqrt(np.sum(np.square(param))) for param in prev_params]
+                logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, 
+                                    np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
-
-                # next_params = [param.get_value(borrow=True) for param in grcnn.params]
-                # next_norms = [np.sqrt(np.sum(np.square(param))) for param in next_params]
-
-                # logger.debug('Parameter norm before updating: ')
-                # logger.debug(prev_norms)
-                # logger.debug('Parameter norm after updating: ')
-                # logger.debug(next_norms)
-
             # Update all the rests
-            logger.debug('After all the batches, there are %d training instances left.' % (train_size-num_batch*batch_size))
             if num_batch * batch_size < train_size:
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -332,25 +317,12 @@ try:
                         hist_grad += np.square(inst_grad)
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
-                # AdaGrad updating
-                # prev_params = [param.get_value(borrow=True) for param in grcnn.params]
-                # prev_norms = [np.sqrt(np.sum(np.square(param))) for param in prev_params]
-
+                    # AdaGrad updating
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= train_size - num_batch*batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
-
-                # next_params = [param.get_value(borrow=True) for param in grcnn.params]
-                # next_norms = [np.sqrt(np.sum(np.square(param))) for param in next_params]
-
-                # logger.debug('In the last AdaGrad updating: ')
-                # logger.debug('Parameter norm before updating: ')
-                # logger.debug(prev_norms)
-                # logger.debug('Parameter norm after updating: ')
-                # logger.debug(next_norms)
-
         # Compute training error
         assert len(total_predictions) == train_size
         total_predictions = np.asarray(total_predictions)
@@ -415,7 +387,6 @@ try:
         results = []
         for k in xrange(num_processes):
             results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
-            # results.append(pool.apply_async(parallel_predict_hard, args=(start_idx, start_idx+step)))
             start_idx += step
         pool.close()
         pool.join()
@@ -431,7 +402,6 @@ try:
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
-            # sentL, n_sentR = neg_test_pairs_set[j]
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: test_costs += 1-score_p+score_n
