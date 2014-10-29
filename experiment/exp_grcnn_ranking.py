@@ -358,11 +358,7 @@ try:
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
                 # AdaGrad updating
-                logger.debug('Model parameters before the last AdaGrad updating: ')
-                for param in grcnn.params:
-                    logger.debug('Parameter {}: '.format(param.name))
-                    logger.debug(param.get_value(borrow=True))
-                logger.debug('*' * 50)
+                prev_params = [param.get_value(borrow=True) for param in grcnn.params]
 
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= train_size - num_batch*batch_size
@@ -370,14 +366,16 @@ try:
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
 
-                logger.debug('Gradients in the last AdaGrad updating epoch: ')
-                for tot_grad in total_grads:
-                    logger.debug(tot_grad)
-                logger.debug('Model parameters after the last AdaGrad updating: ')
-                for param in grcnn.params:
-                    logger.debug('Parameter {}: '.format(param.name))
-                    logger.debug(param.get_value(borrow=True))
-                logger.debug('*' * 50)
+                grad_norms = [np.sqrt(np.sum(np.square(tot_grad))) for tot_grad in total_grads]
+
+                next_params = [param.get_value(borrow=True) for param in grcnn.params]
+
+                diff_norms = [np.sqrt(np.sum(np.square(prev_param, next_param))) for prev_param, next_param in zip(prev_params, next_params)]
+                logger.debug('In the last AdaGrad updating: ')
+                logger.debug('Norm of gradients: ')
+                logger.debug(grad_norms)
+                logger.debug('Norm of difference in parameters: ')
+                logger.debug(diff_norms)
 
         # Compute training error
         assert len(total_predictions) == train_size
