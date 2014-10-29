@@ -56,7 +56,7 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 
 args = parser.parse_args()
 
-np.random.seed(42)
+np.random.seed(20)
 # matching_train_filename = '../data/pair_all_sentence_train.txt'
 # matching_test_filename = '../data/pair_sentence_test.txt'
 #matching_train_filename = '../data/small_pair_train.txt'
@@ -184,7 +184,7 @@ try:
             costs += cost
             
 
-            # logger.debug('Instance %d: score-p: %d, score-n: %f, cost = %f' % (j, score_p, score_n, cost))
+            logger.debug('Instance %d: score-p: %d, score-n: %f, cost = %f' % (j, score_p, score_n, cost))
 
 
             preds.append(score_p >= score_n)
@@ -200,22 +200,6 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
-        return costs, preds
-
-    # Multi-processes for test hard 
-    def parallel_predict_hard(start_idx, end_idx):
-        costs, preds = 0.0, []
-        for j in xrange(start_idx, end_idx):
-            sentL, p_sentR = test_pairs_set[j]
-            sentL, n_sentR = neg_test_pairs_set[j]
-
-            p_sentR, n_sentR = n_sentR, p_sentR
-
-            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-            score_p, score_n = score_p[0], score_n[0]
-            if score_p < 1+score_n: costs += 1-score_p+score_n
-            preds.append(score_p >= score_n)
-            logger.debug('Instance %d, score-p: %f, score-n: %f' % (j, score_p, score_n))
         return costs, preds
 
     for i in xrange(configer.nepoch):
@@ -360,21 +344,20 @@ try:
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
 
                 logger.debug('*' * 50)
-                logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, 
-                                    np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
+                logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
                 # AdaGrad updating
-                prev_params = [param.get_value(borrow=True) for param in grcnn.params]
-                prev_norms = [np.sqrt(np.sum(np.square(param))) for param in prev_params]
+                # prev_params = [param.get_value(borrow=True) for param in grcnn.params]
+                # prev_norms = [np.sqrt(np.sum(np.square(param))) for param in prev_params]
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
 
-                next_params = [param.get_value(borrow=True) for param in grcnn.params]
-                next_norms = [np.sqrt(np.sum(np.square(param))) for param in next_params]
+                # next_params = [param.get_value(borrow=True) for param in grcnn.params]
+                # next_norms = [np.sqrt(np.sum(np.square(param))) for param in next_params]
 
-                logger.debug('Parameter norm before updating: ')
-                logger.debug(prev_norms)
-                logger.debug('Parameter norm after updating: ')
-                logger.debug(next_norms)
+                # logger.debug('Parameter norm before updating: ')
+                # logger.debug(prev_norms)
+                # logger.debug('Parameter norm after updating: ')
+                # logger.debug(next_norms)
 
             # Update all the rests
             logger.debug('After all the batches, there are %d training instances left.' % (train_size-num_batch*batch_size))
@@ -394,8 +377,8 @@ try:
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
                 # AdaGrad updating
-                prev_params = [param.get_value(borrow=True) for param in grcnn.params]
-                prev_norms = [np.sqrt(np.sum(np.square(param))) for param in prev_params]
+                # prev_params = [param.get_value(borrow=True) for param in grcnn.params]
+                # prev_norms = [np.sqrt(np.sum(np.square(param))) for param in prev_params]
 
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= train_size - num_batch*batch_size
@@ -403,14 +386,14 @@ try:
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
 
-                next_params = [param.get_value(borrow=True) for param in grcnn.params]
-                next_norms = [np.sqrt(np.sum(np.square(param))) for param in next_params]
+                # next_params = [param.get_value(borrow=True) for param in grcnn.params]
+                # next_norms = [np.sqrt(np.sum(np.square(param))) for param in next_params]
 
-                logger.debug('In the last AdaGrad updating: ')
-                logger.debug('Parameter norm before updating: ')
-                logger.debug(prev_norms)
-                logger.debug('Parameter norm after updating: ')
-                logger.debug(next_norms)
+                # logger.debug('In the last AdaGrad updating: ')
+                # logger.debug('Parameter norm before updating: ')
+                # logger.debug(prev_norms)
+                # logger.debug('Parameter norm after updating: ')
+                # logger.debug(next_norms)
 
         # Compute training error
         assert len(total_predictions) == train_size
