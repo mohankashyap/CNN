@@ -62,7 +62,7 @@ np.random.seed(1991)
 #matching_train_filename = '../data/small_pair_train.txt'
 #matching_test_filename = '../data/small_pair_test.txt'
 matching_train_filename = '../data/small_pair_train_new.txt'
-matching_test_filename = '../data/small_pair_test_new.txt'
+matching_test_filename = '../data/small_pair_test_new_new.txt'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
@@ -194,8 +194,9 @@ try:
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
 
-            logger.debug('In parallel_predict, Instance: {}, score_p = {}, \
-                score_n = {}, pred = {}'.format(j, score_p, score_n, score_p >= score_n))
+            logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
+                sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
+                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
