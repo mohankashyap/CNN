@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(1991)
-# matching_train_filename = '../data/pair_all_sentence_train.txt'
-# matching_test_filename = '../data/pair_sentence_test.txt'
-matching_train_filename = '../data/small_pair_train.txt'
-matching_test_filename = '../data/small_pair_test.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
+#matching_train_filename = '../data/small_pair_train.txt'
+#matching_test_filename = '../data/small_pair_test.txt'
 # matching_train_filename = '../data/small_pair_train_new.txt'
 #matching_test_filename = '../data/small_pair_test_new.txt'
 
