@@ -263,11 +263,13 @@ try:
                 pool.close()
                 pool.join()
                 # Accumulate results
-                results = [result.get() for result in results]
+                answers = []
+                for z in xrange(num_processes):
+                    answers.append(results[z].get())
                 # Map-Reduce
-                for result in results:
-                    test_costs += result[0]
-                    test_predictions += result[1]
+                for answer in answers:
+                    test_costs += answer[0]
+                    test_predictions += answer[1]
             if t_num_batch * batch_size < test_size:
                 for j in xrange(t_num_batch * batch_size, test_size):
                     sentL, p_sentR = test_pairs_set[j]
@@ -296,12 +298,15 @@ try:
                 pool.close()
                 pool.join()
                 # Accumulate results
-                results = [result.get() for result in results]
+                answers = []
+                for z in xrange(num_processes):
+                    answers.append(results[z].get())
+                # Map-Reduce
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 # Map-Reduce
-                for result in results:
-                    grad, cost, pred = result[0], result[1], result[2]
+                for answer in answers:
+                    grad, cost, pred = answer[0], answer[1], answer[2]
                     for inst_grads in grad:
                         for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
                             tot_grad += inst_grad
