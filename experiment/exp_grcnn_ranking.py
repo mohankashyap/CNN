@@ -77,12 +77,6 @@ with file(matching_test_filename, 'r') as fin:
         p, q = line.split('|||')
         test_pairs_txt.append((p, q))
 
-# For HARD-TASK test
-# with file(matching_test_filename, 'r') as fin:
-#     for line in fin:
-#         p, q, nq = line.split('|||')
-#         test_pairs_txt.append((p, q, nq))
-
 end_time = time.time()
 logger.debug('Finished loading training and test data set...')
 logger.debug('Time used to load training and test pairs: %f seconds.' % (end_time-start_time))
@@ -97,9 +91,6 @@ test_size = len(test_pairs_txt)
 logger.debug('Size of training pairs: %d' % train_size)
 logger.debug('Size of test pairs: %d' % test_size)
 train_pairs_set, test_pairs_set = [], []
-
-# # For HARD task
-# neg_test_pairs_set = []
 # Build word embedding for both training and test data sets
 edim = word_embedding.embedding_dim()
 # Build training data set
@@ -132,32 +123,6 @@ for i, (psent, qsent) in enumerate(test_pairs_txt):
     qvectors[1:-1, :] = np.asarray([word_embedding.wordvec(qword) for qword in qwords], dtype=floatX)
 
     test_pairs_set.append((pvectors, qvectors))
-
-# For HARD-TASK
-# for i, (psent, qsent, npsent) in enumerate(test_pairs_txt):
-#     pwords = psent.split()
-#     pwords = [pword.lower() for pword in pwords]
-#     pvectors = np.zeros((len(pwords)+2, edim), dtype=floatX)
-#     pvectors[0, :], pvectors[-1, :] = blank_token, blank_token
-#     pvectors[1:-1, :] = np.asarray([word_embedding.wordvec(pword) for pword in pwords], dtype=floatX)
-
-#     qwords = qsent.split()
-#     qwords = [qword.lower() for qword in qwords]
-#     qvectors = np.zeros((len(qwords)+2, edim), dtype=floatX)
-#     qvectors[0, :], qvectors[-1, :] = blank_token, blank_token
-#     qvectors[1:-1, :] = np.asarray([word_embedding.wordvec(qword) for qword in qwords], dtype=floatX)
-
-#     npwords = npsent.split()
-#     npwords = [npword.lower() for npword in npwords]
-#     npvectors = np.zeros((len(npwords)+2, edim), dtype=floatX)
-#     npvectors[0, :], npvectors[-1, :] = blank_token, blank_token
-#     npvectors[1:-1, :] = np.asarray([word_embedding.wordvec(npword) for npword in npwords], dtype=floatX)
-
-#     test_pairs_set.append((pvectors, qvectors))
-#     neg_test_pairs_set.append((pvectors, npvectors))
-
-#     logger.debug('Length of sentL: %d, length of p_sentL: %d, length of n_sentL: %d' % (pvectors.shape[0], 
-#                 qvectors.shape[0], npvectors.shape[0]))
 end_time = time.time()
 logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
@@ -214,11 +179,14 @@ try:
             nj = train_neg_index[j]
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
-            # hiddenP, hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
-            # p_score, n_score = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             grads.append(grad)
             costs += cost
+            
+
+            logger.debug('Instance %d: score-p: %d, score-n: %f, cost = %f' % (j, score_p, score_n, cost))
+
+
             preds.append(score_p >= score_n)
         return grads, costs, preds
     # Multi-processes for batch testing
@@ -410,7 +378,6 @@ try:
                 logger.debug(grad_norms)
                 logger.debug('Norm of difference in parameters: ')
                 logger.debug(diff_norms)
-
 
             # Update all the rests
             logger.debug('After all the batches, there are %d training instances left.' % (train_size-num_batch*batch_size))
