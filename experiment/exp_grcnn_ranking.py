@@ -57,11 +57,12 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(1991)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
 #matching_train_filename = '../data/small_pair_train.txt'
 #matching_test_filename = '../data/small_pair_test.txt'
-#matching_test_filename = '../data/small_pair_test_new.txt'
+matching_train_filename = '../data/small_pair_train_new.txt'
+matching_test_filename = '../data/small_pair_test_new.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -340,6 +341,7 @@ try:
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
+            logger.debug('After all the batches, there are %d training instances left.' % (train_size-num_batch*batch_size))
             if num_batch * batch_size < train_size:
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -355,12 +357,28 @@ try:
                         hist_grad += np.square(inst_grad)
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
-                    # AdaGrad updating
+                # AdaGrad updating
+                logger.debug('Model parameters before the last AdaGrad updating: ')
+                for param in grcnn.params:
+                    logger.debug('Parameter {}: '.format(param.name))
+                    logger.debug(param.get_value(borrow=True))
+                logger.debug('*' * 50)
+
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= train_size - num_batch*batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
+
+                logger.debug('Gradients in the last AdaGrad updating epoch: ')
+                for tot_grad in tot_grads:
+                    logger.debug(tot_grad)
+                logger.debug('Model parameters after the last AdaGrad updating: ')
+                for param in grcnn.params:
+                    logger.debug('Parameter {}: '.format(param.name))
+                    logger.debug(param.get_value(borrow=True))
+                logger.debug('*' * 50)
+
         # Compute training error
         assert len(total_predictions) == train_size
         total_predictions = np.asarray(total_predictions)
