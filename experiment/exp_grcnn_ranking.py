@@ -305,6 +305,7 @@ try:
                 grcnn.update_params(total_grads, learn_rate)
             # Update all the rests
             if num_batch * batch_size < train_size:
+                logger.debug('There are %d training instances need to be processed sequentially.' % (train_size-num_batch*batch_size))
                 # Accumulate results
                 total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
@@ -319,12 +320,13 @@ try:
                         hist_grad += np.square(inst_grad)
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
+                    logger.debug('Training instance %d, cost = %f, score-p = %f, score-n = %f' % (j, cost, score_p, score_n))
                     # AdaGrad updating
-                # for tot_grad, hist_grad in zip(total_grads, hist_grads):
-                #     tot_grad /= train_size - num_batch*batch_size
-                #     tot_grad /= fudge_factor + np.sqrt(hist_grad)
+                for tot_grad, hist_grad in zip(total_grads, hist_grads):
+                    tot_grad /= train_size - num_batch*batch_size
+                    tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
-            #     grcnn.update_params(total_grads, learn_rate)
+                grcnn.update_params(total_grads, learn_rate)
         # Compute training error
         assert len(total_predictions) == train_size
         total_predictions = np.asarray(total_predictions)
