@@ -20,7 +20,7 @@ import random
 import argparse
 
 from threading import Thread
-from multiprocessing import Process, Pool, Queue, Lock
+from multiprocessing import Process, Pool, Queue, Manager
 from pprint import pprint
 
 sys.path.append('../source/')
@@ -279,7 +279,7 @@ try:
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
-                lock = Lock()
+                lock = Manager().Lock()
                 results = []
                 for k in xrange(num_processes):
                     results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, lock)))
