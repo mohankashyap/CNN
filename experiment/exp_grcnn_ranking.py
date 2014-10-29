@@ -187,7 +187,7 @@ try:
             preds.append(score_p >= score_n)
         return grads, costs, preds, ranges
     # Multi-processes for batch testing
-    def parallel_predict(start_idx, end_idx):
+    def parallel_predict(start_idx, end_idx, grcnn):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = test_pairs_set[j]
@@ -279,7 +279,7 @@ try:
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, grcnn)))
                     start_idx += step
                 pool.close()
                 pool.join()
@@ -290,10 +290,6 @@ try:
                     
                     test_costs += result[0]
                     test_predictions += result[1]
-
-                    for z, zz in zip(result[2], result[1]):
-                        logger.debug('Instance: {}, prediction = {}'.format(z, zz[0]))
-
 
             if t_num_batch * batch_size < test_size:
                 for j in xrange(t_num_batch * batch_size, test_size):
