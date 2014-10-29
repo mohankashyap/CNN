@@ -220,6 +220,9 @@ try:
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
+                logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
+                sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
+                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))                
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
