@@ -190,17 +190,21 @@ try:
     def parallel_predict(start_idx, end_idx, lock):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
+            
+            lock.acquire()
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
             
-            lock.acquire()
+            
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-            lock.release()
+            
 
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
+            
+            lock.release()
             # DEBUG
             logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, grcnn-ID: {}, os-ID: {}'.format(j, score_p, score_n, 
                 score_p >= score_n, id(grcnn), os.getpid()))
