@@ -57,10 +57,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(1991)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
-#matching_train_filename = '../data/small_pair_train.txt'
-#matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/pair_all_sentence_train.txt'
+# matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/small_pair_train.txt'
+matching_test_filename = '../data/small_pair_test.txt'
 #matching_test_filename = '../data/small_pair_test_new.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
@@ -175,11 +175,10 @@ try:
             nj = train_neg_index[j]
             n_sentR = train_pairs_set[nj][1]
             r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
-            # hiddenP, hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
-            # p_score, n_score = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             grads.append(grad)
             costs += cost
+            logger.debug('Training instance: %d, score-p: %f, score-n: %f, cost = %f' % (j, score_p, score_n, cost))
             preds.append(score_p >= score_n)
         return grads, costs, preds
     # Multi-processes for batch testing
@@ -271,43 +270,7 @@ try:
             # Using Parallel CPU computation
             # Parallel computing inside each batch
             for j in xrange(num_batch):
-                if (j * batch_size) % 10000 == 0: 
-                    logger.debug('%8d @ %4d epoch' % (j*batch_size, i))
-                    # Testing after each training epoch
-                    t_num_batch = test_size / batch_size
-                    test_costs, test_predictions = 0.0, []
-                    for z in xrange(t_num_batch):
-                        start_idx = z * batch_size
-                        step = batch_size / num_processes
-                        # Creating Process Pool
-                        pool = Pool(num_processes)
-                        results = []
-                        for k in xrange(num_processes):
-                            results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
-                            start_idx += step
-                        pool.close()
-                        pool.join()
-                        # Accumulate results
-                        results = [result.get() for result in results]
-                        # Map-Reduce
-                        for result in results:
-                            test_costs += result[0]
-                            test_predictions += result[1]
-                    if t_num_batch * batch_size < test_size:
-                        for z in xrange(t_num_batch * batch_size, test_size):
-                            sentL, p_sentR = test_pairs_set[z]
-                            nz = test_neg_index[z]
-                            n_sentR = test_pairs_set[nz][1]
-                            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-                            score_p, score_n = score_p[0], score_n[0]
-                            if score_p < 1+score_n: test_costs += 1-score_p+score_n
-                            test_predictions.append(score_p >= score_n)
-                    test_predictions = np.asarray(test_predictions)
-                    test_accuracy = np.sum(test_predictions) / float(test_size)
-                    logger.debug('Test accuracy: %f' % test_accuracy)
-                    logger.debug('Test total cost: %f' % test_costs)
-                    logger.debug('-' * 50)
-                ####################################################
+                if (j * batch_size) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j*batch_size, i))
                 start_idx = j * batch_size
                 step = batch_size / num_processes
                 # Creating Process Pool
