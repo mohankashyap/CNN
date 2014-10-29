@@ -371,7 +371,7 @@ try:
                 grcnn.update_params(total_grads, learn_rate)
 
                 logger.debug('Gradients in the last AdaGrad updating epoch: ')
-                for tot_grad in tot_grads:
+                for tot_grad in total_grads:
                     logger.debug(tot_grad)
                 logger.debug('Model parameters after the last AdaGrad updating: ')
                 for param in grcnn.params:
