@@ -193,6 +193,9 @@ try:
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
+
+            logger.debug('In parallel_predict, Instance: {}, score_p = {}, \
+                score_n = {}, pred = {}'.format(j, score_p, score_n, score_p >= score_n))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
@@ -254,6 +257,9 @@ try:
 
             logger.debug('Number of batches in the test set: %d' % t_num_batch)
             for j in xrange(t_num_batch):
+
+                logger.debug('*' * 50)
+
                 start_idx = j * batch_size
                 step = batch_size / num_processes
                 # Creating Process Pool
@@ -271,9 +277,9 @@ try:
                     
                     test_costs += result[0]
                     test_predictions += result[1]
-                    logger.debug('Range: {}'.format(result[2]))
-                    logger.debug('predictions: {}'.format(result[1]))
-                    logger.debug('-' * 50)
+
+                    for z, zz in zip(result[2], result[1]):
+                        logger.debug('Instance: {}, prediction = {}'.format(z, zz[0]))
 
 
             if t_num_batch * batch_size < test_size:
