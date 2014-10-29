@@ -20,7 +20,7 @@ import random
 import argparse
 
 from threading import Thread
-from multiprocessing import Process, Pool, Queue
+from multiprocessing import Process, Pool, Queue, Lock
 from pprint import pprint
 
 sys.path.append('../source/')
@@ -187,13 +187,17 @@ try:
             preds.append(score_p >= score_n)
         return grads, costs, preds, ranges
     # Multi-processes for batch testing
-    def parallel_predict(start_idx, end_idx):
+    def parallel_predict(start_idx, end_idx, lock):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
+            
+            lock.acquire()
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            lock.release()
+
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
@@ -275,9 +279,10 @@ try:
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
+                lock = Lock()
                 results = []
                 for k in xrange(num_processes):
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, lock)))
                     start_idx += step
                 pool.close()
                 pool.join()
