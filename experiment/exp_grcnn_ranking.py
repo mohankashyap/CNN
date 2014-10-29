@@ -63,7 +63,7 @@ np.random.seed(1991)
 #matching_test_filename = '../data/small_pair_test.txt'
 matching_train_filename = '../data/small_pair_train_new.txt'
 # matching_test_filename = '../data/small_pair_test_new.txt'
-matching_test_filename = '../data/pair_sentence_test_hard.txt'
+matching_test_filename = '../data/pair_sentence_test_hard_another.txt'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
