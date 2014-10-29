@@ -80,8 +80,8 @@ with file(matching_train_filename, 'r') as fin:
 # For HARD-TASK test
 with file(matching_test_filename, 'r') as fin:
     for line in fin:
-        p, q, np = line.split('|||')
-        test_pairs_txt.append((p, q, np))
+        p, q, nq = line.split('|||')
+        test_pairs_txt.append((p, q, nq))
 
 end_time = time.time()
 logger.debug('Finished loading training and test data set...')
