@@ -187,7 +187,7 @@ try:
             preds.append(score_p >= score_n)
         return grads, costs, preds, ranges
     # Multi-processes for batch testing
-    def parallel_predict(start_idx, end_idx, grcnn):
+    def parallel_predict(start_idx, end_idx):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = test_pairs_set[j]
@@ -199,8 +199,8 @@ try:
             preds.append(score_p >= score_n)
 
             logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
-                sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
-                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))
+                sentL = {}, psentR = {}, nsentR = {}, grcnn-ID: {}'.format(j, score_p, score_n, score_p >= score_n, 
+                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0], id(grcnn)))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
@@ -225,8 +225,8 @@ try:
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
                 logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
-                sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
-                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))                
+                sentL = {}, psentR = {}, nsentR = {}, grcnn-ID: {}'.format(j, score_p, score_n, score_p >= score_n, 
+                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0], id(grcnn))))                
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
@@ -279,7 +279,7 @@ try:
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, grcnn)))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
                     start_idx += step
                 pool.close()
                 pool.join()
