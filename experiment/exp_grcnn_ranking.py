@@ -242,6 +242,11 @@ try:
                     hist_grad += np.square(inst_grad)
                 total_cost += cost
                 total_predictions.append(score_p >= score_n)
+
+                logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
+                sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
+                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))
+
                 if (j+1) % batch_size == 0 or j == train_size-1:
                     # AdaGrad updating
                     for tot_grad, hist_grad in zip(total_grads, hist_grads):
