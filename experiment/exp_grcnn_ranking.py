@@ -224,38 +224,38 @@ try:
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
             logger.debug('Test total cost using initial model before any training on whole training set: %f' % test_costs)
-            # Start training
-            total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-            hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-            # Using GPU computation
-            for j in xrange(train_size):
-                if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
-                sentL, p_sentR = train_pairs_set[j]
-                nj = train_neg_index[j]
-                n_sentR = train_pairs_set[nj][1]
-                # Call GrCNNMatchRanker
-                r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
-                # Accumulate results
-                for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
-                    tot_grad += inst_grad
-                    hist_grad += np.square(inst_grad)
-                total_cost += cost
-                total_predictions.append(score_p >= score_n)
+            # # Start training
+            # total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            # hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            # # Using GPU computation
+            # for j in xrange(train_size):
+            #     if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
+            #     sentL, p_sentR = train_pairs_set[j]
+            #     nj = train_neg_index[j]
+            #     n_sentR = train_pairs_set[nj][1]
+            #     # Call GrCNNMatchRanker
+            #     r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
+            #     inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
+            #     # Accumulate results
+            #     for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
+            #         tot_grad += inst_grad
+            #         hist_grad += np.square(inst_grad)
+            #     total_cost += cost
+            #     total_predictions.append(score_p >= score_n)
 
-                logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
-                sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
-                                                            sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))
+            #     logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, \
+            #     sentL = {}, psentR = {}, nsentR = {}'.format(j, score_p, score_n, score_p >= score_n, 
+            #                                                 sentL.shape[0], p_sentR.shape[0], n_sentR.shape[0]))
 
-                if (j+1) % batch_size == 0 or j == train_size-1:
-                    # AdaGrad updating
-                    for tot_grad, hist_grad in zip(total_grads, hist_grads):
-                        tot_grad /= batch_size
-                        tot_grad /= fudge_factor + np.sqrt(hist_grad)
-                    # Check total grads
-                    grcnn.update_params(total_grads, learn_rate)
-                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-                    hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            #     if (j+1) % batch_size == 0 or j == train_size-1:
+            #         # AdaGrad updating
+            #         for tot_grad, hist_grad in zip(total_grads, hist_grads):
+            #             tot_grad /= batch_size
+            #             tot_grad /= fudge_factor + np.sqrt(hist_grad)
+            #         # Check total grads
+            #         grcnn.update_params(total_grads, learn_rate)
+            #         total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            #         hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
         else:
             # Testing after each training epoch
             t_num_batch = test_size / batch_size
