@@ -205,28 +205,10 @@ try:
         num_batch = train_size / batch_size
         logger.debug('Batch size = %d' % batch_size)
         logger.debug('Total number of batches: %d' % num_batch)
-        # Testing after each training epoch
-        t_num_batch = test_size / batch_size
-        test_costs, test_predictions = 0.0, []
-        for j in xrange(t_num_batch):
-            start_idx = j * batch_size
-            step = batch_size / num_processes
-            # Creating Process Pool
-            pool = Pool(num_processes)
-            results = []
-            for k in xrange(num_processes):
-                results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
-                start_idx += step
-            pool.close()
-            pool.join()
-            # Accumulate results
-            results = [result.get() for result in results]
-            # Map-Reduce
-            for result in results:
-                test_costs += result[0]
-                test_predictions += result[1]
-        if t_num_batch * batch_size < test_size:
-            for j in xrange(t_num_batch * batch_size, test_size):
+
+        if args.gpu:
+            test_costs, test_predictions = 0.0, []
+            for j in xrange(test_size):
                 sentL, p_sentR = test_pairs_set[j]
                 nj = test_neg_index[j]
                 n_sentR = test_pairs_set[nj][1]
@@ -234,12 +216,11 @@ try:
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
-        test_predictions = np.asarray(test_predictions)
-        test_accuracy = np.sum(test_predictions) / float(test_size)
-        logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
-        logger.debug('Test total cost using initial model before any training on whole training set: %f' % test_costs)
-
-        if args.gpu:
+            test_predictions = np.asarray(test_predictions)
+            test_accuracy = np.sum(test_predictions) / float(test_size)
+            logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
+            logger.debug('Test total cost using initial model before any training on whole training set: %f' % test_costs)
+            # Start training
             total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             # Using GPU computation
@@ -250,24 +231,56 @@ try:
                 n_sentR = train_pairs_set[nj][1]
                 # Call GrCNNMatchRanker
                 r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
-                grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
+                inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
                 # Accumulate results
-                for gt, g in zip(total_grads, grad):
-                    gt += g
-                for gt, g in zip(hist_grads, grad):
-                    gt += np.square(g)
+                for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
+                    tot_grad += inst_grad
+                    hist_grad += np.square(inst_grad)
                 total_cost += cost
                 total_predictions.append(score_p >= score_n)
                 if (j+1) % batch_size == 0 or j == len(train_instances)-1:
                     # AdaGrad updating
-                    for grad, hist_grad in zip(total_grads, hist_grads):
-                        grad /= batch_size
-                        grad /= fudge_factor + np.sqrt(hist_grad)
+                    for tot_grad, hist_grad in zip(total_grads, hist_grads):
+                        tot_grad /= batch_size
+                        tot_grad /= fudge_factor + np.sqrt(hist_grad)
                     # Check total grads
                     grcnn.update_params(total_grads, learn_rate)
                     total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                     hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
         else:
+            # Testing after each training epoch
+            t_num_batch = test_size / batch_size
+            test_costs, test_predictions = 0.0, []
+            for j in xrange(t_num_batch):
+                start_idx = j * batch_size
+                step = batch_size / num_processes
+                # Creating Process Pool
+                pool = Pool(num_processes)
+                results = []
+                for k in xrange(num_processes):
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+                    start_idx += step
+                pool.close()
+                pool.join()
+                # Accumulate results
+                results = [result.get() for result in results]
+                # Map-Reduce
+                for result in results:
+                    test_costs += result[0]
+                    test_predictions += result[1]
+            if t_num_batch * batch_size < test_size:
+                for j in xrange(t_num_batch * batch_size, test_size):
+                    sentL, p_sentR = test_pairs_set[j]
+                    nj = test_neg_index[j]
+                    n_sentR = test_pairs_set[nj][1]
+                    score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                    score_p, score_n = score_p[0], score_n[0]
+                    if score_p < 1+score_n: test_costs += 1-score_p+score_n
+                    test_predictions.append(score_p >= score_n)
+            test_predictions = np.asarray(test_predictions)
+            test_accuracy = np.sum(test_predictions) / float(test_size)
+            logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
+            logger.debug('Test total cost using initial model before any training on whole training set: %f' % test_costs)
             # Using Parallel CPU computation
             # Parallel computing inside each batch
             for j in xrange(num_batch):
@@ -320,7 +333,6 @@ try:
                         hist_grad += np.square(inst_grad)
                     total_cost += cost
                     total_predictions.append(score_p >= score_n)
-                    logger.debug('Training instance %d, cost = %f, score-p = %f, score-n = %f' % (j, cost, score_p, score_n))
                     # AdaGrad updating
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= train_size - num_batch*batch_size
@@ -340,25 +352,8 @@ try:
         # Testing after each training epoch
         t_num_batch = test_size / batch_size
         test_costs, test_predictions = 0.0, []
-        for j in xrange(t_num_batch):
-            start_idx = j * batch_size
-            step = batch_size / num_processes
-            # Creating Process Pool
-            pool = Pool(num_processes)
-            results = []
-            for k in xrange(num_processes):
-                results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
-                start_idx += step
-            pool.close()
-            pool.join()
-            # Accumulate results
-            results = [result.get() for result in results]
-            # Map-Reduce
-            for result in results:
-                test_costs += result[0]
-                test_predictions += result[1]
-        if t_num_batch * batch_size < test_size:
-            for j in xrange(t_num_batch * batch_size, test_size):
+        if args.gpu:
+            for j in xrange(test_size):
                 sentL, p_sentR = test_pairs_set[j]
                 nj = test_neg_index[j]
                 n_sentR = test_pairs_set[nj][1]
@@ -366,6 +361,33 @@ try:
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
+        else:
+            for j in xrange(t_num_batch):
+                start_idx = j * batch_size
+                step = batch_size / num_processes
+                # Creating Process Pool
+                pool = Pool(num_processes)
+                results = []
+                for k in xrange(num_processes):
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step)))
+                    start_idx += step
+                pool.close()
+                pool.join()
+                # Accumulate results
+                results = [result.get() for result in results]
+                # Map-Reduce
+                for result in results:
+                    test_costs += result[0]
+                    test_predictions += result[1]
+            if t_num_batch * batch_size < test_size:
+                for j in xrange(t_num_batch * batch_size, test_size):
+                    sentL, p_sentR = test_pairs_set[j]
+                    nj = test_neg_index[j]
+                    n_sentR = test_pairs_set[nj][1]
+                    score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                    score_p, score_n = score_p[0], score_n[0]
+                    if score_p < 1+score_n: test_costs += 1-score_p+score_n
+                    test_predictions.append(score_p >= score_n)
         test_predictions = np.asarray(test_predictions)
         test_accuracy = np.sum(test_predictions) / float(test_size)
         logger.debug('Test accuracy: %f' % test_accuracy)
