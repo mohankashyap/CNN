@@ -43,12 +43,10 @@ class GrCNNEncoder(object):
         # Set seed of the random generator
         np.random.seed(config.random_seed)
         # Projection matrix U
-        # Initialize all the matrices using orthogonal matrices
-        
-        # U_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_in, fan_out))
-        # U_val = U_val.astype(floatX)
-        # U_val *= self.scale
-        U_val = np.eye(fan_in, fan_out, dtype=floatX)
+        # Initialize all the matrices using orthogonal matrices        
+        U_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_in, fan_out))
+        U_val = U_val.astype(floatX)
+        U_val *= self.scale
         self.U = theano.shared(value=U_val, name='U', borrow=True)
         self.hidden0 = T.dot(self.input, self.U)
 
@@ -78,8 +76,7 @@ class GrCNNEncoder(object):
 
         self.Gb = theano.shared(value=np.zeros(3, dtype=floatX), name='Gb', borrow=True)
         # Save all the parameters into one batch
-        # self.params = [self.U, self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
-        self.params = [self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
+        self.params = [self.U, self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
         # Length of the time sequence
         self.nsteps = self.input.shape[0]
         self.pyramids, _ = theano.scan(fn=self._step_prop, 
