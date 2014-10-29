@@ -61,7 +61,9 @@ np.random.seed(1991)
 # matching_test_filename = '../data/pair_sentence_test.txt'
 matching_train_filename = '../data/small_pair_train.txt'
 matching_test_filename = '../data/small_pair_test.txt'
+# matching_train_filename = '../data/small_pair_train_new.txt'
 #matching_test_filename = '../data/small_pair_test_new.txt'
+
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -296,7 +298,7 @@ try:
                 # AdaGrad updating
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= batch_size
-                    tot_grad /= fudge_factor + np.sqrt(hist_grad)
+                    # tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, 
                                     np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
                 # Compute the norm of gradients 
@@ -320,7 +322,7 @@ try:
                     # AdaGrad updating
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= train_size - num_batch*batch_size
-                    tot_grad /= fudge_factor + np.sqrt(hist_grad)
+                    # tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
                 grcnn.update_params(total_grads, learn_rate)
         # Compute training error
