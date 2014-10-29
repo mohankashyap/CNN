@@ -166,8 +166,8 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './grCNN_ranker.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
-# grcnn = GrCNNMatchScorer(configer, verbose=True)
-grcnn = GrCNNMatchScorer.load('./GrCNNMatchRanker-RANK-GOOD.pkl')
+grcnn = GrCNNMatchScorer(configer, verbose=True)
+# grcnn = GrCNNMatchScorer.load('./GrCNNMatchRanker-RANK-GOOD.pkl')
 end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
@@ -390,6 +390,8 @@ try:
                 for tot_grad, hist_grad in zip(total_grads, hist_grads):
                     tot_grad /= batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
+
+                logger.debug('*' * 50)
                 logger.debug('Current cost = %f, correct accuracy = %f' % (total_cost, 
                                     np.sum(np.asarray(total_predictions)) / float((j+1)*batch_size)))
                 # AdaGrad updating
@@ -409,7 +411,7 @@ try:
                 logger.debug('Norm of difference in parameters: ')
                 logger.debug(diff_norms)
 
-                
+
             # Update all the rests
             logger.debug('After all the batches, there are %d training instances left.' % (train_size-num_batch*batch_size))
             if num_batch * batch_size < train_size:
