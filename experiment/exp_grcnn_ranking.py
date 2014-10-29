@@ -234,7 +234,7 @@ try:
         return costs, preds
 
     # Multi-processes for test hard 
-    for parallel_predict_hard(start_idx, end_idx):
+    def parallel_predict_hard(start_idx, end_idx):
         costs, preds = 0.0, []
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = test_pairs_set[j]
