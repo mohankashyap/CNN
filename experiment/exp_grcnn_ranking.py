@@ -14,6 +14,7 @@ import unittest
 import csv
 import time
 import cPickle
+import copy
 import logging
 import traceback
 import random
@@ -187,11 +188,10 @@ try:
             preds.append(score_p >= score_n)
         return grads, costs, preds, ranges
     # Multi-processes for batch testing
-    def parallel_predict(start_idx, end_idx, lock):
+    def parallel_predict(start_idx, end_idx, grcnn):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             
-            lock.acquire()
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
@@ -204,7 +204,6 @@ try:
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
             
-            lock.release()
             # DEBUG
             logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, grcnn-ID: {}, os-ID: {}'.format(j, score_p, score_n, 
                 score_p >= score_n, id(grcnn), os.getpid()))
@@ -283,10 +282,10 @@ try:
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
-                lock = Manager().Lock()
+                # lock = Manager().Lock()
                 results = []
                 for k in xrange(num_processes):
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, lock)))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, copy.deepcopy(grcnn))))
                     start_idx += step
                 pool.close()
                 pool.join()
