@@ -238,7 +238,7 @@ try:
                     hist_grad += np.square(inst_grad)
                 total_cost += cost
                 total_predictions.append(score_p >= score_n)
-                if (j+1) % batch_size == 0 or j == len(train_instances)-1:
+                if (j+1) % batch_size == 0 or j == len(train_size)-1:
                     # AdaGrad updating
                     for tot_grad, hist_grad in zip(total_grads, hist_grads):
                         tot_grad /= batch_size
