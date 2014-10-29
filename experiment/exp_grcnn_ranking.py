@@ -179,7 +179,6 @@ try:
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             grads.append(grad)
             costs += cost
-            logger.debug('Training instance: %d, score-p: %f, score-n: %f, cost = %f' % (j, score_p, score_n, cost))
             preds.append(score_p >= score_n)
         return grads, costs, preds
     # Multi-processes for batch testing
