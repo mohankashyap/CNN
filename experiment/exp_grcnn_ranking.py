@@ -209,8 +209,7 @@ try:
             preds.append(score_p >= score_n)            
             # DEBUG
             logger.debug('Instance: {}, score_p = {}, score_n = {}, worker-ID: {}, pid: {}'.format(j, score_p, score_n, 
-                id(worker_id), os.getpid()))
-            logger.debug('ID-parameter: {}'.format(id(workers[worker_id].params)))
+                id(worker), os.getpid()))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
