@@ -522,8 +522,8 @@ class GrCNNMatchScorer(object):
         @grcnn: GrCNNMatchScorer. Copy the model parameters of another GrCNNMatchScorer and use it.
         '''
         for p, param in zip(self.params, grcnn.params):
-            val = param.get_value(borrow=True)
-            p.set_value(val, borrow=True)
+            val = param.get_value()
+            p.set_value(val)
 
     @staticmethod
     def save(fname, model):

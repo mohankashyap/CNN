@@ -176,12 +176,16 @@ try:
     start_time = time.time()
     # Build multiple workers for parallel processing
     workers = []
+    calls = []
     if args.cpu:
         for z in xrange(num_processes):
             new_worker = GrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
+            f = theano.function(inputs=[new_worker.inputPL, new_worker.inputPR, new_worker.inputNL, new_worker.inputNR],
+                                outputs=[new_worker.scoreP, new_worker.scoreN])
             workers.append(new_worker)
-            logger.debug('ID of worker {}: {}'.format(z, new_worker))
+            calls.append(f)
+            logger.debug('ID of worker {}: {}'.format(z, id(new_worker)))
         end_time = time.time()
         logger.debug('Time used to deepcopy multiple workers: %f seconds.' % (end_time-start_time))
     # Multi-processes for batch learning
@@ -198,19 +202,18 @@ try:
             preds.append(score_p >= score_n)
         return grads, costs, preds, ranges
     # Multi-processes for batch testing
-    def parallel_predict(start_idx, end_idx, worker):
+    def parallel_predict(start_idx, end_idx, worker_id):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
-            score_p, score_n = worker.show_scores(sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = calls[worker_id](sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)            
             # DEBUG
-            logger.debug('Instance: {}, score_p = {}, score_n = {}, worker-ID: {}, pid: {}'.format(j, score_p, score_n, 
-                id(worker), os.getpid()))
+            logger.debug('Instance: {}, score_p = {}, score_n = {}, pid: {}'.format(j, score_p, score_n, os.getpid()))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
@@ -287,8 +290,8 @@ try:
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
-                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k]))
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, workers[k])))
+                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
                     start_idx += step
                 pool.close()
                 pool.join()
