@@ -176,26 +176,22 @@ try:
     start_time = time.time()
     # Build multiple workers for parallel processing
     workers = []
-    calls = []
     if args.cpu:
         for z in xrange(num_processes):
             new_worker = GrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
-            f = theano.function(inputs=[new_worker.inputPL, new_worker.inputPR, new_worker.inputNL, new_worker.inputNR],
-                                outputs=[new_worker.scoreP, new_worker.scoreN])
             workers.append(new_worker)
-            calls.append(f)
             logger.debug('ID of worker {}: {}'.format(z, id(new_worker)))
         end_time = time.time()
         logger.debug('Time used to deepcopy multiple workers: %f seconds.' % (end_time-start_time))
     # Multi-processes for batch learning
-    def parallel_process(start_idx, end_idx, worker):
+    def parallel_process(start_idx, end_idx, worker_id):
         grads, costs, preds, ranges = [], 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = train_pairs_set[j]
             nj = train_neg_index[j]
             n_sentR = train_pairs_set[nj][1]
-            r = worker.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
+            r = workers[worker_id].compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             grads.append(grad)
             costs += cost
@@ -208,7 +204,7 @@ try:
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
-            score_p, score_n = calls[worker_id](sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = workers[worker_id].show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)            
@@ -236,8 +232,7 @@ try:
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
-                logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, grcnn-ID: {}, os-ID: {}'.format(j, score_p, score_n, 
-                    score_p >= score_n, id(grcnn), os.getpid()))
+                logger.debug('Instance: {}, score_p = {}, score_n = {}, pid: {}'.format(j, score_p, score_n, os.getpid()))
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
@@ -312,6 +307,9 @@ try:
                     score_p, score_n = score_p[0], score_n[0]
                     if score_p < 1+score_n: test_costs += 1-score_p+score_n
                     test_predictions.append(score_p >= score_n)
+
+                    logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
+
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
