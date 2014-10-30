@@ -515,15 +515,15 @@ class GrCNNMatchScorer(object):
         @params: [np.ndarray]. List of numpy.ndarray to set the model parameters.
         '''
         for p, param in zip(self.params, params):
-            p.set_value(param, borrow=False)
+            p.set_value(param, borrow=True)
 
     def deepcopy(self, grcnn):
         '''
         @grcnn: GrCNNMatchScorer. Copy the model parameters of another GrCNNMatchScorer and use it.
         '''
         for p, param in zip(self.params, grcnn.params):
-            val = param.get_value(borrow=False)
-            p.set_value(val, borrow=False)
+            val = param.get_value(borrow=True)
+            p.set_value(val, borrow=True)
 
     @staticmethod
     def save(fname, model):

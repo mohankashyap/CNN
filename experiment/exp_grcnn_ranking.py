@@ -208,8 +208,9 @@ try:
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)            
             # DEBUG
-            logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, worker: {}, grcnn-ID: {}, pid: {}'.format(j, score_p, score_n, 
-                score_p >= score_n, worker_id, id(workers[worker_id]), os.getpid()))
+            logger.debug('Instance: {}, score_p = {}, score_n = {}, worker: {}, grcnn-ID: {}, pid: {}'.format(j, score_p, score_n, 
+                worker_id, id(workers[worker_id]), os.getpid()))
+            logger.debug('ID-parameter: {}'.format(id(workers[worker_id].params)))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
@@ -284,7 +285,6 @@ try:
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
-                # lock = Manager().Lock()
                 results = []
                 for k in xrange(num_processes):
                     results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
