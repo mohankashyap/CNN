@@ -130,8 +130,10 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './grCNN_ranker.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
-# grcnn = GrCNNMatchScorer(configer, verbose=True)
-grcnn = GrCNNMatchScorer.load('./GrCNNMatchRanker-RANK-GOOD.pkl')
+grcnn = GrCNNMatchScorer(configer, verbose=True)
+init_params = [np.random.rand(param.get_value().shape) for param in grcnn.params]
+grcnn.set_params(init_params)
+# grcnn = GrCNNMatchScorer.load('./GrCNNMatchRanker-RANK-GOOD.pkl')
 end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
