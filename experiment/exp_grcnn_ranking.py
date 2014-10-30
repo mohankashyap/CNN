@@ -282,21 +282,27 @@ try:
                 start_idx = j * batch_size
                 step = batch_size / num_processes
                 # Creating Process Pool
-                pool = Pool(num_processes)
+                # pool = Pool(num_processes)
                 results = []
+                processes = []
                 for k in xrange(num_processes):
                     logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
+                    p = Process(target=parallel_predict, args=(start_idx, start_idx+step, k))
+                    # results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
                     start_idx += step
-                pool.close()
-                pool.join()
+                    p.start()
+                    processes.append(p)
+                for p in processes:
+                    p.join()                
+                # pool.close()
+                # pool.join()
                 # Accumulate results
-                results = [result.get() for result in results]
-                # Map-Reduce
-                for result in results:
+                # results = [result.get() for result in results]
+                # # Map-Reduce
+                # for result in results:
                     
-                    test_costs += result[0]
-                    test_predictions += result[1]
+                #     test_costs += result[0]
+                #     test_predictions += result[1]
 
             if t_num_batch * batch_size < test_size:
                 for j in xrange(t_num_batch * batch_size, test_size):
