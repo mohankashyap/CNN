@@ -184,14 +184,8 @@ try:
             new_worker = GrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
             workers.append(new_worker)
-            logger.debug('ID of worker {}: {}'.format(z, id(new_worker)))
-            for param in new_worker.params:
-                logger.debug('{} -- norm = {}'.format(param.name, np.sqrt(np.sum(np.square(param.get_value())))))
         end_time = time.time()
         logger.debug('Time used to deepcopy multiple workers: %f seconds.' % (end_time-start_time))
-
-        for param in grcnn.params:
-            logger.debug('{} -- norm = {}'.format(param.name, np.sqrt(np.sum(np.square(param.get_value())))))
     # Multi-processes for batch learning
     def parallel_process(start_idx, end_idx, worker_id):
         grads, costs, preds, ranges = [], 0.0, [], range(start_idx, end_idx)
@@ -305,16 +299,12 @@ try:
             #                     id(grcnn), hiddenP_norm, hiddenN_norm, score_p, score_n))
             #     logger.debug('-'* 50)
             for j in xrange(t_num_batch):
-
-                logger.debug('*' * 50)
-
                 start_idx = j * batch_size
                 step = batch_size / num_processes
                 # Creating Process Pool
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
-                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
                     results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
                     start_idx += step
                 pool.close()
@@ -335,9 +325,7 @@ try:
                     score_p, score_n = score_p[0], score_n[0]
                     if score_p < 1+score_n: test_costs += 1-score_p+score_n
                     test_predictions.append(score_p >= score_n)
-
                     logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
-
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
