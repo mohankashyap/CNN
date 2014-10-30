@@ -183,8 +183,13 @@ try:
             new_worker.deepcopy(grcnn)
             workers.append(new_worker)
             logger.debug('ID of worker {}: {}'.format(z, id(new_worker)))
+            for param in new_worker.params:
+                logger.debug('{} -- norm = {}'.format(param.name, np.sqrt(np.sum(np.square(param.get_value())))))
         end_time = time.time()
         logger.debug('Time used to deepcopy multiple workers: %f seconds.' % (end_time-start_time))
+
+        for param in grcnn.params:
+            logger.debug('{} -- norm = {}'.format(param.name, np.sqrt(np.sum(np.square(param.get_value())))))
     # Multi-processes for batch learning
     def parallel_process(start_idx, end_idx, worker_id):
         grads, costs, preds, ranges = [], 0.0, [], range(start_idx, end_idx)

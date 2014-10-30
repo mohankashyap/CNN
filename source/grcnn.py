@@ -524,6 +524,7 @@ class GrCNNMatchScorer(object):
         '''
         @grcnn: GrCNNMatchScorer. Copy the model parameters of another GrCNNMatchScorer and use it.
         '''
+        assert len(self.params) == len(grcnn.params)
         for p, param in zip(self.params, grcnn.params):
             val = param.get_value()
             p.set_value(val)
