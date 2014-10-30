@@ -185,26 +185,26 @@ try:
         end_time = time.time()
         logger.debug('Time used to deepcopy multiple workers: %f seconds.' % (end_time-start_time))
     # Multi-processes for batch learning
-    def parallel_process(start_idx, end_idx, worker):
+    def parallel_process(start_idx, end_idx, worker_id):
         grads, costs, preds, ranges = [], 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = train_pairs_set[j]
             nj = train_neg_index[j]
             n_sentR = train_pairs_set[nj][1]
-            r = worker.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
+            r = workers[worker_id].compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             grads.append(grad)
             costs += cost
             preds.append(score_p >= score_n)
         return grads, costs, preds, ranges
     # Multi-processes for batch testing
-    def parallel_predict(start_idx, end_idx, worker):
+    def parallel_predict(start_idx, end_idx, worker_id):
         costs, preds, ranges = 0.0, [], range(start_idx, end_idx)
         for j in xrange(start_idx, end_idx):
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
-            score_p, score_n = worker.show_scores(sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = workers[worker_id].show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)            
@@ -233,8 +233,7 @@ try:
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
-                logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, grcnn-ID: {}, os-ID: {}'.format(j, score_p, score_n, 
-                    score_p >= score_n, id(grcnn), os.getpid()))
+                logger.debug('Instance: {}, score_p = {}, score_n = {}, pid: {}'.format(j, score_p, score_n, os.getpid()))
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
@@ -287,8 +286,8 @@ try:
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
-                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k]))
-                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, workers[k])))
+                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
                     start_idx += step
                 pool.close()
                 pool.join()
@@ -309,6 +308,9 @@ try:
                     score_p, score_n = score_p[0], score_n[0]
                     if score_p < 1+score_n: test_costs += 1-score_p+score_n
                     test_predictions.append(score_p >= score_n)
+
+                    logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
+
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
             logger.debug('Test accuracy using initial model before any training on whole training set: %f' % test_accuracy)
