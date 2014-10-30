@@ -181,6 +181,7 @@ try:
             new_worker = GrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
             workers.append(new_worker)
+            logger.debug('ID of worker {}: {}'.format(z, new_worker))
         end_time = time.time()
         logger.debug('Time used to deepcopy multiple workers: %f seconds.' % (end_time-start_time))
     # Multi-processes for batch learning
@@ -209,8 +210,7 @@ try:
             preds.append(score_p >= score_n)            
             # DEBUG
             logger.debug('Instance: {}, score_p = {}, score_n = {}, worker-ID: {}, pid: {}'.format(j, score_p, score_n, 
-                id(worker_id), os.getpid()))
-            logger.debug('ID-parameter: {}'.format(id(workers[worker_id].params)))
+                id(worker), os.getpid()))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
