@@ -214,33 +214,12 @@ try:
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
             score_p, score_n = workers[worker_id].show_scores(sentL, p_sentR, sentL, n_sentR)
-            r_sentL, r_p_sentR, _, r_n_sentR = workers[worker_id].show_inputs(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)
             # DEBUG
-            hiddenP, hiddenN = workers[worker_id].show_hiddens(sentL, p_sentR, sentL, n_sentR)
-
-            grcnn_score_p, grcnn_score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-            grcnn_score_p, grcnn_score_n = grcnn_score_p[0], grcnn_score_n[0]
-            grcnn_hiddenP, grcnn_hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
-            grcnn_hiddenP_norm = np.sqrt(np.sum(np.square(grcnn_hiddenP)))
-            grcnn_hiddenN_norm = np.sqrt(np.sum(np.square(grcnn_hiddenN)))
-
-            hiddenP_norm = np.sqrt(np.sum(np.square(hiddenP)))
-            hiddenN_norm = np.sqrt(np.sum(np.square(hiddenN)))
-            sentL_norm = np.sqrt(np.sum(np.square(sentL)))
-            p_sentR_norm = np.sqrt(np.sum(np.square(p_sentR)))
-            n_sentR_norm = np.sqrt(np.sum(np.square(n_sentR)))
             logger.debug('Instance: {}, score_p = {}, score_n = {}, worker-id: {}, pid: {}'.\
                     format(j, score_p, score_n, id(workers[worker_id]), os.getpid()))
-            logger.debug('sentL norm = {}, p_sentR norm = {}, n_sentR norm = {}'.format(sentL_norm, 
-                    p_sentR_norm, n_sentR_norm))
-            logger.debug('hiddenP norm = {}, hiddenN norm = {}'.format(hiddenP_norm, hiddenN_norm))
-            logger.debug('GrCNN hiddenP norm = {}, GrCNN hiddenN norm = {}'.format(grcnn_hiddenP_norm, 
-                    grcnn_hiddenN_norm))
-            logger.debug('GrCNN score-p = {}, GrCNN score-n = {}'.format(grcnn_score_p, grcnn_score_n))
-            logger.debug('='* 50)
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
