@@ -287,6 +287,7 @@ try:
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
+                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k]))
                     results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, workers[k])))
                     start_idx += step
                 pool.close()
