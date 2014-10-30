@@ -208,8 +208,8 @@ try:
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)            
             # DEBUG
-            logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, grcnn-ID: {}, os-ID: {}'.format(j, score_p, score_n, 
-                score_p >= score_n, id(grcnn), os.getpid()))
+            logger.debug('Instance: {}, score_p = {}, score_n = {}, pred = {}, worker: {}, grcnn-ID: {}, pid: {}'.format(j, score_p, score_n, 
+                score_p >= score_n, worker_id, id(workers[worker_id]), os.getpid()))
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
