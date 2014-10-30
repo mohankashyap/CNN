@@ -208,8 +208,8 @@ try:
             if score_p < 1+score_n: costs += 1-score_p+score_n
             preds.append(score_p >= score_n)            
             # DEBUG
-            logger.debug('Instance: {}, score_p = {}, score_n = {}, worker: {}, grcnn-ID: {}, pid: {}'.format(j, score_p, score_n, 
-                worker_id, id(workers[worker_id]), os.getpid()))
+            logger.debug('Instance: {}, score_p = {}, score_n = {}, worker-ID: {}, pid: {}'.format(j, score_p, score_n, 
+                id(worker_id), os.getpid()))
             logger.debug('ID-parameter: {}'.format(id(workers[worker_id].params)))
         return costs, preds, ranges
 
