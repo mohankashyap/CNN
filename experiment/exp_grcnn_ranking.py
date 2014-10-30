@@ -331,7 +331,7 @@ try:
 
                 start_idx = j * batch_size
                 step = batch_size / num_processes
-                Creating Process Pool
+                # Creating Process Pool
                 pool = Pool(num_processes)
                 results = []
                 for k in xrange(num_processes):
