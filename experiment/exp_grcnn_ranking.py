@@ -306,58 +306,58 @@ try:
             test_costs, test_predictions = 0.0, []
 
             logger.debug('Number of batches in the test set: %d' % t_num_batch)
-            for j in xrange(test_size):
-                logger.debug('=' * 50)
-                sentL, p_sentR = test_pairs_set[j]
-                nj = test_neg_index[j]
-                n_sentR = test_pairs_set[nj][1]
+            # for j in xrange(test_size):
+            #     logger.debug('=' * 50)
+            #     sentL, p_sentR = test_pairs_set[j]
+            #     nj = test_neg_index[j]
+            #     n_sentR = test_pairs_set[nj][1]
+            #     for k in xrange(num_processes):
+            #         hiddenP, hiddenN = workers[k].show_hiddens(sentL, p_sentR, sentL, n_sentR)
+            #         hiddenP_norm, hiddenN_norm = np.sqrt(np.sum(np.square(hiddenP))), np.sqrt(np.sum(np.square(hiddenN)))
+            #         score_p, score_n = workers[k].show_scores(sentL, p_sentR, sentL, n_sentR)
+            #         score_p, score_n = score_p[0], score_n[0]
+            #         logger.debug('Worker {}, id = {}, hiddenP norm = {}, hiddenN norm = {}, score-p = {}, score-n = {}'.format(
+            #                      k, id(workers[k]), hiddenP_norm, hiddenN_norm, score_p, score_n))
+            #     hiddenP, hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
+            #     hiddenP_norm, hiddenN_norm = np.sqrt(np.sum(np.square(hiddenP))), np.sqrt(np.sum(np.square(hiddenN)))
+            #     score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            #     score_p, score_n = score_p[0], score_n[0]
+            #     logger.debug('GrCNN, id = {}, hiddenP norm = {}, hiddenN norm = {}, score-p = {}, score-n = {}'.format(
+            #                     id(grcnn), hiddenP_norm, hiddenN_norm, score_p, score_n))
+            #     logger.debug('-'* 50)
+            for j in xrange(t_num_batch):
+
+                logger.debug('*' * 50)
+
+                start_idx = j * batch_size
+                step = batch_size / num_processes
+                Creating Process Pool
+                pool = Pool(num_processes)
+                results = []
                 for k in xrange(num_processes):
-                    hiddenP, hiddenN = workers[k].show_hiddens(sentL, p_sentR, sentL, n_sentR)
-                    hiddenP_norm, hiddenN_norm = np.sqrt(np.sum(np.square(hiddenP))), np.sqrt(np.sum(np.square(hiddenN)))
-                    score_p, score_n = workers[k].show_scores(sentL, p_sentR, sentL, n_sentR)
+                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
+                    results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
+                    start_idx += step
+                pool.close()
+                pool.join()
+                # Accumulate results
+                results = [result.get() for result in results]
+                # Map-Reduce
+                for result in results:
+                    test_costs += result[0]
+                    test_predictions += result[1]
+
+            if t_num_batch * batch_size < test_size:
+                for j in xrange(t_num_batch * batch_size, test_size):
+                    sentL, p_sentR = test_pairs_set[j]
+                    nj = test_neg_index[j]
+                    n_sentR = test_pairs_set[nj][1]
+                    score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
                     score_p, score_n = score_p[0], score_n[0]
-                    logger.debug('Worker {}, id = {}, hiddenP norm = {}, hiddenN norm = {}, score-p = {}, score-n = {}'.format(
-                                 k, id(workers[k]), hiddenP_norm, hiddenN_norm, score_p, score_n))
-                hiddenP, hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
-                hiddenP_norm, hiddenN_norm = np.sqrt(np.sum(np.square(hiddenP))), np.sqrt(np.sum(np.square(hiddenN)))
-                score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-                score_p, score_n = score_p[0], score_n[0]
-                logger.debug('GrCNN, id = {}, hiddenP norm = {}, hiddenN norm = {}, score-p = {}, score-n = {}'.format(
-                                id(grcnn), hiddenP_norm, hiddenN_norm, score_p, score_n))
-                logger.debug('-'* 50)
-            #for j in xrange(t_num_batch):
+                    if score_p < 1+score_n: test_costs += 1-score_p+score_n
+                    test_predictions.append(score_p >= score_n)
 
-                #logger.debug('*' * 50)
-
-                #start_idx = j * batch_size
-                #step = batch_size / num_processes
-                #Creating Process Pool
-                #pool = Pool(num_processes)
-                #results = []
-                #for k in xrange(num_processes):
-                    #logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
-                    #results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
-                    #start_idx += step
-                #pool.close()
-                #pool.join()
-                #Accumulate results
-                #results = [result.get() for result in results]
-                 #Map-Reduce
-                #for result in results:
-                    #test_costs += result[0]
-                    #test_predictions += result[1]
-
-            #if t_num_batch * batch_size < test_size:
-                #for j in xrange(t_num_batch * batch_size, test_size):
-                    #sentL, p_sentR = test_pairs_set[j]
-                    #nj = test_neg_index[j]
-                    #n_sentR = test_pairs_set[nj][1]
-                    #score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
-                    #score_p, score_n = score_p[0], score_n[0]
-                    #if score_p < 1+score_n: test_costs += 1-score_p+score_n
-                    #test_predictions.append(score_p >= score_n)
-
-                    #logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
+                    logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
 
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)
