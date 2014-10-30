@@ -177,6 +177,7 @@ try:
     # Build multiple workers for parallel processing
     workers = []
     if args.cpu:
+        logger.debug('ID of Global GrCNN: {}'.format(id(grcnn)))
         for z in xrange(num_processes):
             new_worker = GrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
@@ -192,6 +193,7 @@ try:
             nj = train_neg_index[j]
             n_sentR = train_pairs_set[nj][1]
             r = workers[worker_id].compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
+            #r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
             grads.append(grad)
             costs += cost
@@ -205,11 +207,33 @@ try:
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
             score_p, score_n = workers[worker_id].show_scores(sentL, p_sentR, sentL, n_sentR)
+            r_sentL, r_p_sentR, _, r_n_sentR = workers[worker_id].show_inputs(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
-            preds.append(score_p >= score_n)            
+            preds.append(score_p >= score_n)
             # DEBUG
-            logger.debug('Instance: {}, score_p = {}, score_n = {}, pid: {}'.format(j, score_p, score_n, os.getpid()))
+            hiddenP, hiddenN = workers[worker_id].show_hiddens(sentL, p_sentR, sentL, n_sentR)
+
+            grcnn_score_p, grcnn_score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            grcnn_score_p, grcnn_score_n = grcnn_score_p[0], grcnn_score_n[0]
+            grcnn_hiddenP, grcnn_hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
+            grcnn_hiddenP_norm = np.sqrt(np.sum(np.square(grcnn_hiddenP)))
+            grcnn_hiddenN_norm = np.sqrt(np.sum(np.square(grcnn_hiddenN)))
+
+            hiddenP_norm = np.sqrt(np.sum(np.square(hiddenP)))
+            hiddenN_norm = np.sqrt(np.sum(np.square(hiddenN)))
+            sentL_norm = np.sqrt(np.sum(np.square(sentL)))
+            p_sentR_norm = np.sqrt(np.sum(np.square(p_sentR)))
+            n_sentR_norm = np.sqrt(np.sum(np.square(n_sentR)))
+            logger.debug('Instance: {}, score_p = {}, score_n = {}, worker-id: {}, pid: {}'.\
+                    format(j, score_p, score_n, id(workers[worker_id]), os.getpid()))
+            logger.debug('sentL norm = {}, p_sentR norm = {}, n_sentR norm = {}'.format(sentL_norm, 
+                    p_sentR_norm, n_sentR_norm))
+            logger.debug('hiddenP norm = {}, hiddenN norm = {}'.format(hiddenP_norm, hiddenN_norm))
+            logger.debug('GrCNN hiddenP norm = {}, GrCNN hiddenN norm = {}'.format(grcnn_hiddenP_norm, 
+                    grcnn_hiddenN_norm))
+            logger.debug('GrCNN score-p = {}, GrCNN score-n = {}'.format(grcnn_score_p, grcnn_score_n))
+            logger.debug('='* 50)
         return costs, preds, ranges
 
     for i in xrange(configer.nepoch):
@@ -275,46 +299,58 @@ try:
             test_costs, test_predictions = 0.0, []
 
             logger.debug('Number of batches in the test set: %d' % t_num_batch)
-            for j in xrange(t_num_batch):
-
-                logger.debug('*' * 50)
-
-                start_idx = j * batch_size
-                step = batch_size / num_processes
-                # Creating Process Pool
-                # pool = Pool(num_processes)
-                results = []
-                processes = []
+            for j in xrange(test_size):
+                logger.debug('=' * 50)
+                sentL, p_sentR = test_pairs_set[j]
+                nj = test_neg_index[j]
+                n_sentR = test_pairs_set[nj][1]
                 for k in xrange(num_processes):
-                    logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
-                    p = Process(target=parallel_predict, args=(start_idx, start_idx+step, k))
-                    # results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
-                    start_idx += step
-                    p.start()
-                    processes.append(p)
-                for p in processes:
-                    p.join()                
-                # pool.close()
-                # pool.join()
-                # Accumulate results
-                # results = [result.get() for result in results]
-                # # Map-Reduce
-                # for result in results:
-                    
-                #     test_costs += result[0]
-                #     test_predictions += result[1]
-
-            if t_num_batch * batch_size < test_size:
-                for j in xrange(t_num_batch * batch_size, test_size):
-                    sentL, p_sentR = test_pairs_set[j]
-                    nj = test_neg_index[j]
-                    n_sentR = test_pairs_set[nj][1]
-                    score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                    hiddenP, hiddenN = workers[k].show_hiddens(sentL, p_sentR, sentL, n_sentR)
+                    hiddenP_norm, hiddenN_norm = np.sqrt(np.sum(np.square(hiddenP))), np.sqrt(np.sum(np.square(hiddenN)))
+                    score_p, score_n = workers[k].show_scores(sentL, p_sentR, sentL, n_sentR)
                     score_p, score_n = score_p[0], score_n[0]
-                    if score_p < 1+score_n: test_costs += 1-score_p+score_n
-                    test_predictions.append(score_p >= score_n)
+                    logger.debug('Worker {}, id = {}, hiddenP norm = {}, hiddenN norm = {}, score-p = {}, score-n = {}'.format(
+                                 k, id(workers[k]), hiddenP_norm, hiddenN_norm, score_p, score_n))
+                hiddenP, hiddenN = grcnn.show_hiddens(sentL, p_sentR, sentL, n_sentR)
+                hiddenP_norm, hiddenN_norm = np.sqrt(np.sum(np.square(hiddenP))), np.sqrt(np.sum(np.square(hiddenN)))
+                score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                score_p, score_n = score_p[0], score_n[0]
+                logger.debug('GrCNN, id = {}, hiddenP norm = {}, hiddenN norm = {}, score-p = {}, score-n = {}'.format(
+                                id(grcnn), hiddenP_norm, hiddenN_norm, score_p, score_n))
+                logger.debug('-'* 50)
+            #for j in xrange(t_num_batch):
 
-                    logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
+                #logger.debug('*' * 50)
+
+                #start_idx = j * batch_size
+                #step = batch_size / num_processes
+                #Creating Process Pool
+                #pool = Pool(num_processes)
+                #results = []
+                #for k in xrange(num_processes):
+                    #logger.debug('In the inner loop, id of worker {} = {}'.format(k, id(workers[k])))
+                    #results.append(pool.apply_async(parallel_predict, args=(start_idx, start_idx+step, k)))
+                    #start_idx += step
+                #pool.close()
+                #pool.join()
+                #Accumulate results
+                #results = [result.get() for result in results]
+                 #Map-Reduce
+                #for result in results:
+                    #test_costs += result[0]
+                    #test_predictions += result[1]
+
+            #if t_num_batch * batch_size < test_size:
+                #for j in xrange(t_num_batch * batch_size, test_size):
+                    #sentL, p_sentR = test_pairs_set[j]
+                    #nj = test_neg_index[j]
+                    #n_sentR = test_pairs_set[nj][1]
+                    #score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                    #score_p, score_n = score_p[0], score_n[0]
+                    #if score_p < 1+score_n: test_costs += 1-score_p+score_n
+                    #test_predictions.append(score_p >= score_n)
+
+                    #logger.debug('Instance: %d, score_p = %f, score_n = %f' % (j, score_p, score_n))
 
             test_predictions = np.asarray(test_predictions)
             test_accuracy = np.sum(test_predictions) / float(test_size)

@@ -493,6 +493,9 @@ class GrCNNMatchScorer(object):
                                            outputs=[self.scoreP, self.scoreN])
         self.show_hiddens = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
                                             outputs=[self.hiddenP, self.hiddenN])
+        self.show_inputs = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
+                                           outputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR])
+
         if verbose:
             logger.debug('Architecture of GrCNNMatchScorer built finished, summarized below: ')
             logger.debug('Input dimension: %d' % config.num_input)
