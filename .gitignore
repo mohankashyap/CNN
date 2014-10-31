@@ -13,5 +13,6 @@ experiment/*.mat
 experiment/*.pyc
 experiment/*.model
 experiment/*.txt
+experiment/*.log
 records/
 
