@@ -317,7 +317,7 @@ try:
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
         if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
-        Testing after each training epoch
+        # Testing after each training epoch
         t_num_batch = test_size / batch_size
         test_costs, test_predictions = 0.0, []
         if args.gpu:
