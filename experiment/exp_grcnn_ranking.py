@@ -58,12 +58,12 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(1991)
-# matching_train_filename = '../data/pair_all_sentence_train.txt'
-# matching_test_filename = '../data/pair_sentence_test.txt'
-#matching_train_filename = '../data/small_pair_train.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
+# matching_train_filename = '../data/small_pair_train.txt'
 #matching_test_filename = '../data/small_pair_test.txt'
-matching_train_filename = '../data/small_pair_train_new.txt'
-matching_test_filename = '../data/small_pair_test_new.txt'
+# matching_train_filename = '../data/small_pair_train_new.txt'
+# matching_test_filename = '../data/small_pair_test_new.txt'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
@@ -317,7 +317,7 @@ try:
         # Reporting after each training epoch
         logger.debug('Training @ %d epoch, total cost = %f, accuracy = %f' % (i, total_cost, train_accuracy))
         if train_accuracy > highest_train_accuracy: highest_train_accuracy = train_accuracy
-        Testing after each training epoch
+        # Testing after each training epoch
         t_num_batch = test_size / batch_size
         test_costs, test_predictions = 0.0, []
         if args.gpu:
