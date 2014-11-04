@@ -262,13 +262,13 @@ class ExtGrCNNEncoder(object):
         multi_gates = T.nnet.softmax(T.dot(left_current_level, self.Gl) + 
                                      T.dot(right_current_level, self.Gr) + 
                                      self.Gb)
-        next_level = multi_gates[:, 0] * left_current_level + multi_gates[:, -1] * right_current_level
+        # Softmax-Gating combination
         multi_gates = multi_gates.dimshuffle(0, 1, 'x')
-        tmp = multi_gates[:, 1:-1, :] * multi_centrals
-        tmp = T.sum(next_level, axis=1)
-        next_level += tmp
+        next_level = multi_gates[:, 1:-1, :] * multi_centrals
+        next_level = T.sum(next_level, axis=1)
+        next_level += multi_gates[:, 0] * left_current_level + multi_gates[:, -1] * right_current_level
         return T.set_subtensor(current_level[:nsteps-iter-1], next_level)
-
+ 
     def encode(self, inputM):
         '''
         @input: Theano symbolic matrix. Compress the input matrix into output vector. The first dimension
@@ -652,3 +652,139 @@ class GrCNNMatchScorer(object):
             model = cPickle.load(fin)
         return model
 
+
+class ExtGrCNNMatchScorer(object):
+    '''
+    Extended Gated Recursive Convolutional Neural Network for matching task. The last 
+    layer of the model includes a linear layer for regression.
+    '''
+    def __init__(self, config=None, verbose=True):
+        # Construct two GrCNNEncoders for matching two sentences
+        self.encoderL = ExtGrCNNEncoder(config, verbose)
+        self.encoderR = ExtGrCNNEncoder(config, verbose)
+        # Link the parameters of two parts
+        self.params = []
+        self.params += self.encoderL.params
+        self.params += self.encoderR.params
+        # Build three kinds of inputs:
+        # 1, inputL, inputR. This pair is used for computing the score after training
+        # 2, inputPL, inputPR. This part is used for training positive pairs
+        # 3, inputNL, inputNR. This part is used for training negative pairs
+        self.inputL = self.encoderL.input
+        self.inputR = self.encoderR.input
+        # Positive
+        self.inputPL = T.matrix(name='inputPL', dtype=floatX)
+        self.inputPR = T.matrix(name='inputPR', dtype=floatX)
+        # Negative
+        self.inputNL = T.matrix(name='inputNL', dtype=floatX)
+        self.inputNR = T.matrix(name='inputNR', dtype=floatX)
+        # Linking input-output mapping
+        self.hiddenL = self.encoderL.output
+        self.hiddenR = self.encoderR.output
+        # Positive 
+        self.hiddenPL = self.encoderL.encode(self.inputPL)
+        self.hiddenPR = self.encoderR.encode(self.inputPR)
+        # Negative
+        self.hiddenNL = self.encoderL.encode(self.inputNL)
+        self.hiddenNR = self.encoderR.encode(self.inputNR)
+        # Activation function
+        self.act = Activation(config.activation)
+        # MLP Component
+        self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=1)
+        self.hiddenP = T.concatenate([self.hiddenPL, self.hiddenPR], axis=1)
+        self.hiddenN = T.concatenate([self.hiddenNL, self.hiddenNR], axis=1)
+        # Build hidden layer
+        self.hidden_layer = HiddenLayer(self.hidden, (2*config.num_hidden, config.num_mlp), act=Activation(config.hiddenact))
+        self.compressed_hidden = self.hidden_layer.output
+        self.compressed_hiddenP = self.hidden_layer.encode(self.hiddenP)
+        self.compressed_hiddenN = self.hidden_layer.encode(self.hiddenN)
+        # Accumulate parameters
+        self.params += self.hidden_layer.params
+        # Dropout parameter
+        srng = T.shared_randomstreams.RandomStreams(config.random_seed)
+        mask = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hidden.shape)
+        maskP = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hiddenP.shape)
+        maskN = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hiddenN.shape)
+        self.compressed_hidden *= T.cast(mask, floatX)
+        self.compressed_hiddenP *= T.cast(maskP, floatX)
+        self.compressed_hiddenN *= T.cast(maskN, floatX)
+        # Score layers
+        self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp)
+        self.output = self.score_layer.output
+        self.scoreP = self.score_layer.encode(self.compressed_hiddenP)
+        self.scoreN = self.score_layer.encode(self.compressed_hiddenN)
+        # Accumulate parameters
+        self.params += self.score_layer.params
+        # Build cost function
+        self.cost = T.mean(T.maximum(T.zeros_like(self.scoreP), 1.0 - self.scoreP + self.scoreN))
+        # Construct the gradient of the cost function with respect to the model parameters
+        self.gradparams = T.grad(self.cost, self.params)
+        # Compute the total number of parameters in the model
+        self.num_params_encoder = self.encoderL.num_params + self.encoderR.num_params
+        self.num_params_classifier = 2 * config.num_hidden * config.num_mlp + \
+                                     config.num_mlp + \
+                                     config.num_mlp + 1
+        self.num_params = self.num_params_encoder + self.num_params_classifier
+        # Build class methods
+        self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
+        self.compute_cost_and_gradient = theano.function(inputs=[self.inputPL, self.inputPR, 
+                                                                 self.inputNL, self.inputNR],
+                                                         outputs=self.gradparams+[self.cost, self.scoreP, self.scoreN])
+        self.show_scores = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR], 
+                                           outputs=[self.scoreP, self.scoreN])
+        self.show_hiddens = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
+                                            outputs=[self.hiddenP, self.hiddenN])
+        self.show_inputs = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
+                                           outputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR])
+
+        if verbose:
+            logger.debug('Architecture of ExtGrCNNMatchScorer built finished, summarized below: ')
+            logger.debug('Input dimension: %d' % config.num_input)
+            logger.debug('Hidden dimension inside GrCNNMatchScorer pyramid: %d' % config.num_hidden)
+            logger.debug('Hidden dimension MLP: %d' % config.num_mlp)
+            logger.debug('Number of Gating functions: %d' % config.num_gates)
+            logger.debug('There are 2 ExtGrCNNEncoders used in model.')
+            logger.debug('Total number of parameters used in the model: %d' % self.num_params)
+
+    def update_params(self, grads, learn_rate): 
+        '''
+        @grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
+        @learn_rate: scalar. Learning rate.
+        '''
+        for param, grad in zip(self.params, grads):
+            p = param.get_value(borrow=True)
+            param.set_value(p - learn_rate * grad, borrow=True)
+
+    def set_params(self, params):
+        '''
+        @params: [np.ndarray]. List of numpy.ndarray to set the model parameters.
+        '''
+        for p, param in zip(self.params, params):
+            p.set_value(param, borrow=True)
+
+    def deepcopy(self, grcnn):
+        '''
+        @grcnn: GrCNNMatchScorer. Copy the model parameters of another GrCNNMatchScorer and use it.
+        '''
+        assert len(self.params) == len(grcnn.params)
+        for p, param in zip(self.params, grcnn.params):
+            val = param.get_value()
+            p.set_value(val)
+
+    @staticmethod
+    def save(fname, model):
+        '''
+        @fname: String. Filename to store the model.
+        @model: GrCNNMatchScorer. An instance of GrCNNMatchScorer to be saved.
+        '''
+        with file(fname, 'wb') as fout:
+            cPickle.dump(model, fout)
+
+    @staticmethod
+    def load(fname):
+        '''
+        @fname: String. Filename to load the model.
+        '''
+        with file(fname, 'rb') as fin:
+            model = cPickle.load(fin)
+        return model
