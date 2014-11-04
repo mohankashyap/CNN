@@ -176,6 +176,114 @@ class GrCNNEncoder(object):
         output = pyramids[-1][0].dimshuffle('x', 0)
         return output
 
+class ExtGrCNNEncoder(object):
+    '''
+    An extension of the canonical GrCNN, with more than 1 gate at each local binary window.
+    '''
+    def __init__(self, config, verbose=True):
+        '''
+        @config: GrCNNConfiger. Configer used to set the architecture of ExtGrCNNEncoder.
+        '''
+        if verbose: logger.debug('Building Extended Gated Recursive Convolutional Neural Network Encoder...')
+        # Scale factor for initializing model parameters
+        self.scale = config.scale
+        # Make theano symbolic tensor for input and model parameters
+        self.input = T.matrix(name='ExtGrCNNEncoder input', dtype=floatX)
+        # Configure activation function
+        self.act = Activation(config.activation)
+        fan_in, fan_out = config.num_input, config.num_hidden
+        # Initialize model parameter
+        np.random.seed(config.random_seed)
+        # Projection matrix U
+        U_val = np.random.uniform(low=-1.0, high=1.0, size=(fan_in, fan_out))
+        U_val = U_val.astype(floatX)
+        U_val *= self.scale
+        self.U = theano.shared(value=U_val, name='U', borrow=True)
+        self.hidden0 = T.dot(self.input, self.U)
+        # 3rd-tensor to implement the multi-gate GrCNN Encoders, where the first dimension corresponds
+        # to the number of gates
+        Wl_vals = [np.random.uniform(low=-1.0, high=1.0, size=(fan_out, fan_out)).astype(floatX) for _ in xrange(config.num_gates)]
+        Wl_vals = [np.linalg.svd(Wl_val)[0] for Wl_val in Wl_vals]
+        Wl_vals = np.asarray(Wl_vals)
+        self.Wl = theano.shared(value=Wl_vals, name='W_l', borrow=True)
+
+        Wr_vals = [np.random.uniform(low=-1.0, high=1.0, size=(fan_out, fan_out)).astype(floatX) for _ in xrange(config.num_gates)]
+        Wr_vals = [np.linalg.svd(Wr_val)[0] for Wr_val in Wr_vals]
+        Wr_vals = np.asarray(Wr_vals)
+        self.Wr = theano.shared(value=Wr_vals, name='W_r', borrow=True)
+
+        self.Wb = theano.shared(value=np.zeros((config.num_gates, fan_out), dtype=floatX), name='W_b', borrow=True)
+        # Multi-gate choosing functions
+        Gl_vals = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, config.num_gates+2)).astype(floatX)
+        self.Gl = theano.shared(value=Gl_vals, name='G_l', borrow=True)
+
+        Gr_vals = np.random.uniform(low=-1.0, high=1.0, size=(fan_out, config.num_gates+2)).astype(floatX)
+        self.Gr = theano.shared(value=Gr_vals, name='G_r', borrow=True)
+
+        self.Gb = theano.shared(value=np.zeros(config.num_gates+2, dtype=floatX), name='G_b', borrow=True)
+        # Stack all the model parameters
+        self.params = [self.U, self.Wl, self.Wr, self.Wb, self.Gl, self.Gr, self.Gb]
+        self.num_params = fan_in * fan_out + 2 * config.num_gates * fan_out * fan_out + config.num_gates * fan_out + \
+                          2 * (config.num_gates+2) * fan_out + config.num_gates + 2
+        # Length of the time sequence
+        self.nsteps = self.input.shape[0]
+        # Building ExtGrCNNEncoder pyramids
+        self.pyramids, _ = theano.scan(fn=self._step_prop, 
+                                    sequences=T.arange(self.nsteps-1),
+                                    non_sequences=self.nsteps,
+                                    outputs_info=[self.hidden0],
+                                    n_steps=self.nsteps-1)
+        self.output = self.pyramids[-1][0].dimshuffle('x', 0)
+        # Compression -- Encoding function
+        self.compress = theano.function(inputs=[self.input], outputs=self.output)
+        if verbose:
+            logger.debug('Finished constructing the structure of ExtGrCNN Encoder: ')
+            logger.debug('Size of the input dimension: %d' % fan_in)
+            logger.debug('Size of the hidden dimension: %d' % fan_out)
+            logger.debug('Number of gating functions: %d' % config.num_gates)
+            logger.debug('Number of parameters in ExtGrCNN: %d' % self.num_params)
+            logger.debug('Activation function: %s' % config.activation)
+
+    def _step_prop(self, iter, current_level, nsteps):
+        '''
+        @current_level: Input matrix at current level. The first dimension corresponds to the time dimension 
+        while the second dimension corresponds to the dimension of hidden representation
+        '''
+        # Building shifted matrix, due to the constraints of Theano.scan, we have to keep the shape of the 
+        # input and output matrix, of size Txd
+        left_current_level = current_level[:nsteps-iter-1]
+        right_current_level = current_level[1:nsteps-iter]
+        # Compute the temporary central multi-representation, of size TxKxd, where T is the dimension of 
+        # time, K is the dimension of number of gates and d is the dimension of hidden representation
+        multi_centrals = self.act.activate(T.dot(left_current_level, self.Wl) + 
+                                           T.dot(right_current_level, self.Wr) + 
+                                           self.Wb)
+        # Compute the gating function, of size Tx(K+2)
+        multi_gates = T.nnet.softmax(T.dot(left_current_level, self.Gl) + 
+                                     T.dot(right_current_level, self.Gr) + 
+                                     self.Gb)
+        next_level = multi_gates[:, 0] * left_current_level + multi_gates[:, -1] * right_current_level
+        multi_gates = multi_gates.dimshuffle(0, 1, 'x')
+        tmp = multi_gates[:, 1:-1, :] * multi_centrals
+        tmp = T.sum(next_level, axis=1)
+        next_level += tmp
+        return T.set_subtensor(current_level[:nsteps-iter-1], next_level)
+
+    def encode(self, inputM):
+        '''
+        @input: Theano symbolic matrix. Compress the input matrix into output vector. The first dimension
+                of inputM should correspond to the time dimension.
+        '''
+        hidden = T.dot(inputM, self.U)
+        nsteps = inputM.shape[0]
+        pyramids, _ = theano.scan(fn=self._step_prop, 
+                                sequences=T.arange(nsteps-1),
+                                non_sequences=nsteps, 
+                                outputs_info=[hidden],
+                                n_steps=nsteps-1)
+        output = pyramids[-1][0].dimshuffle('x', 0)
+        return output
+
 
 class GrCNN(object):
     '''
