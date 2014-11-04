@@ -174,7 +174,7 @@ try:
         logger.debug('ID of Global ExtGrCNN: {}'.format(id(grcnn)))
         for z in xrange(num_processes):
             start_time = time.time()
-            new_worker = GrCNNMatchScorer(configer, verbose=False)
+            new_worker = ExtGrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
             workers.append(new_worker)
             end_time = time.time()
@@ -424,4 +424,4 @@ finally:
     params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
     sio.savemat('ExtGrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
-    GrCNNMatcher.save('ExtGrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
+    ExtGrCNNMatcher.save('ExtGrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
