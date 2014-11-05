@@ -326,7 +326,7 @@ class BRNNEncoder(object):
 		self.h_forward = T.mean(self.h_forwards, axis=0)
 		self.h_backward = T.mean(self.h_backwards, axis=0)
 		# Concatenate
-		self.output = T.concatenate([self.h_forward, self.h_backward], axis=1)
+		self.output = T.concatenate([self.h_forward, self.h_backward], axis=0)
 		# L1, L2 regularization
 		self.L1_norm = T.sum(T.abs_(self.W_forward) + T.abs_(self.W_backward) + 
 							 T.abs_(self.U_forward) + T.abs_(self.U_backward))
