@@ -556,7 +556,7 @@ class BRNNMatchScorer(object):
 			logger.debug('Hidden dimension of MLP: %d' % config.num_mlp)
 			logger.debug('There are 2 BRNNEncoders used in the model.')
 			logger.debug('Total number of parameters in this model: %d' % self.num_params)
-			
+
 	def update_params(self, grads, learn_rate):
 		'''
 		@grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
@@ -566,6 +566,22 @@ class BRNNMatchScorer(object):
 		for param, grad in zip(self.params, grads):
 			p = param.get_value(borrow=True)
 			param.set_value(p - learn_rate * grad, borrow=True)
+
+	def set_params(self, params):
+		'''
+		@params: [np.ndarray]. List of numpy.ndarray to set the model parameters.
+		'''
+		for p, param in zip(self.params, params):
+			p.set_value(param, borrow=True)
+
+	def deepcopy(self, brnn):
+		'''
+		@brnn: BRNNMatchScorer. Copy the model parameters of another BRNNMatchScorer.
+		'''
+		assert len(self.params) == len(brnn.params)
+		for p, param in zip(self.params, brnn.params):
+			val = param.get_value()
+			p.set_value(val)
 
 	@staticmethod
 	def save(fname, model):
