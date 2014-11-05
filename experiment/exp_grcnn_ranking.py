@@ -60,7 +60,7 @@ args = parser.parse_args()
 np.random.seed(1991)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
 matching_test_filename = '../data/pair_sentence_test.txt'
-# matching_train_filename = '../data/small_pair_train.txt'
+#matching_train_filename = '../data/small_pair_train.txt'
 #matching_test_filename = '../data/small_pair_test.txt'
 # matching_train_filename = '../data/small_pair_train_new.txt'
 # matching_test_filename = '../data/small_pair_test_new.txt'
@@ -419,7 +419,7 @@ except:
     if args.cpu and pool != None:
         logger.debug('Quiting all subprocesses...')
         pool.terminate()
-finally:            
+finally:
     logger.debug('Saving existing model and parameters...')
     params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
     sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
