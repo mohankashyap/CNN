@@ -18,7 +18,9 @@ import utils
 from utils import floatX
 from activations import Activation
 from logistic import SoftmaxLayer, LogisticLayer
+from score import ScoreLayer
 from mlp import HiddenLayer
+
 
 logger = logging.getLogger(__name__)
 
@@ -502,9 +504,9 @@ class BRNNMatchScorer(object):
 		self.hiddenNR = self.encoderR.encode(self.inputNR)
 		# Activation function
 		self.act = Activation(config.activation)
-		self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=1)
-		self.hiddenP = T.concatenate([self.hiddenPL, self.hiddenPR], axis=1)
-		self.hiddenN = T.concatenate([self.hiddenNL, self.hiddenNR], axis=1)
+		self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=0)
+		self.hiddenP = T.concatenate([self.hiddenPL, self.hiddenPR], axis=0)
+		self.hiddenN = T.concatenate([self.hiddenNL, self.hiddenNR], axis=0)
 		# Build hidden layer
 		self.hidden_layer = HiddenLayer(self.hidden, 
 										(4*config.num_hidden, config.num_mlp), 
@@ -530,7 +532,7 @@ class BRNNMatchScorer(object):
 		# Accumulate parameters
 		self.params += self.score_layer.params
 		# Build cost function
-		self.cost = T.mean(T.maximum(T.zero_likes(self.scoreP), 1.0 - self.scoreP + self.scoreN))
+		self.cost = T.mean(T.maximum(T.zeros_like(self.scoreP), 1.0 - self.scoreP + self.scoreN))
 		# Construct the total number of parameters in the model
 		self.gradparams = T.grad(self.cost, self.params)
 		# Compute the total number of parameters in the model
