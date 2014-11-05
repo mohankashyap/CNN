@@ -58,12 +58,12 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 args = parser.parse_args()
 
 np.random.seed(1991)
-#matching_train_filename = '../data/pair_all_sentence_train.txt'
-#matching_test_filename = '../data/pair_sentence_test.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test.txt'
 #matching_train_filename = '../data/small_pair_train.txt'
 #matching_test_filename = '../data/small_pair_test.txt'
-matching_train_filename = '../data/small_pair_train_new.txt'
-matching_test_filename = '../data/small_pair_test_new.txt'
+#matching_train_filename = '../data/small_pair_train_new.txt'
+#matching_test_filename = '../data/small_pair_test_new.txt'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
@@ -188,9 +188,6 @@ try:
             n_sentR = train_pairs_set[nj][1]
             r = workers[worker_id].compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR)
             grad, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
-            
-            logger.debug('Instance: %d, score-p: %f, score-n: %f' % (j, score_p, score_n))
-
             grads.append(grad)
             costs += cost
             preds.append(score_p >= score_n)
