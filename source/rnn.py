@@ -326,7 +326,7 @@ class BRNNEncoder(object):
 		self.h_forward = T.mean(self.h_forwards, axis=0)
 		self.h_backward = T.mean(self.h_backwards, axis=0)
 		# Concatenate
-		self.output = T.concatenate([self.h_forward, self.h_backward], axis=0)
+		self.output = T.concatenate([self.h_forward, self.h_backward], axis=1)
 		# L1, L2 regularization
 		self.L1_norm = T.sum(T.abs_(self.W_forward) + T.abs_(self.W_backward) + 
 							 T.abs_(self.U_forward) + T.abs_(self.U_backward))
@@ -479,61 +479,84 @@ class BRNNMatchScorer(object):
 		self.params += self.encoderL.params
 		self.params += self.encoderR.params
 		# Set up input
+		# Note that there are three kinds of inputs altogether, including:
+		# 1, inputL, inputR. This pair is used for computing the score after training
+		# 2, inputPL, inputPR. This pair is used for training positive pairs
+		# 3, inputNL, inputNR. This pair is used for training negative pairs
 		self.inputL = self.encoderL.input
 		self.inputR = self.encoderR.input
+		# Positive 
+		self.inputPL = T.matrix(name='inputPL', dtype=floatX)
+		self.inputPR = T.matrix(name='inputPR', dtype=floatX)
+		# Negative
+		self.inputNL = T.matrix(name='inputNL', dtype=floatX)
+		self.inputNR = T.matrix(name='inputNR', dtype=floatX)
 		# Get output of two BRNNEncoders
 		self.hiddenL = self.encoderL.output
 		self.hiddenR = self.encoderR.output
+		# Positive Hidden
+		self.hiddenPL = self.encoderL.encode(self.inputPL)
+		self.hiddenPR = self.encoderR.encode(self.inputPR)
+		# Negative Hidden
+		self.hiddenNL = self.encoderL.encode(self.inputNL)
+		self.hiddenNR = self.encoderR.encode(self.inputNR)
 		# Activation function
 		self.act = Activation(config.activation)
-		# MLP Component
-		self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=0)
+		self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=1)
+		self.hiddenP = T.concatenate([self.hiddenPL, self.hiddenPR], axis=1)
+		self.hiddenN = T.concatenate([self.hiddenNL, self.hiddenNR], axis=1)
+		# Build hidden layer
 		self.hidden_layer = HiddenLayer(self.hidden, 
 										(4*config.num_hidden, config.num_mlp), 
 										act=Activation(config.hiddenact))
 		self.compressed_hidden = self.hidden_layer.output
+		self.compressed_hiddenP = self.hidden_layer.encode(self.hiddenP)
+		self.compressed_hiddenN = self.hidden_layer.encode(self.hiddenN)
 		# Accumulate parameters
 		self.params += self.hidden_layer.params
 		# Dropout parameter
 		srng = T.shared_randomstreams.RandomStreams(config.random_seed)
 		mask = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hidden.shape)
+		maskP = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hiddenP.shape)
+		maskN = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hiddenN.shape)
 		self.compressed_hidden *= T.cast(mask, floatX)
-		# Logistic regression
-		self.logistic_layer = LogisticLayer(self.compressed_hidden, config.num_mlp)
-		self.output = self.logistic_layer.output
-		self.pred = self.logistic_layer.pred
+		self.compressed_hiddenP *= T.cast(maskP, floatX)
+		self.compressed_hiddenN *= T.cast(maskN, floatX)
+		# Score layer
+		self.score_layer = ScoreLayer(self.compressed_hidden, config.num_mlp)
+		self.output = self.score_layer.output
+		self.scoreP = self.score_layer.encode(self.compressed_hiddenP)
+		self.scoreN = self.score_layer.encode(self.compressed_hiddenN)
 		# Accumulate parameters
-		self.params += self.logistic_layer.params
+		self.params += self.score_layer.params
+		# Build cost function
+		self.cost = T.mean(T.maximum(T.zero_likes(self.scoreP), 1.0 - self.scoreP + self.scoreN))
+		# Construct the total number of parameters in the model
+		self.gradparams = T.grad(self.cost, self.params)
 		# Compute the total number of parameters in the model
 		self.num_params_encoder = self.encoderL.num_params + self.encoderR.num_params
 		self.num_params_classifier = 2 * config.num_hidden * config.num_mlp + config.num_mlp + \
 									 config.num_mlp + 1
 		self.num_params = self.num_params_encoder + self.num_params_classifier
-		# Build target function
-		self.truth = T.ivector(name='label')
-		self.cost = self.logistic_layer.NLL_loss(self.truth)
-		# Build computational graph and compute the gradients of the model parameters
-		# with respect to the cost function
-		self.gradparams = T.grad(self.cost, self.params)
-		# Compile theano function
-		self.objective = theano.function(inputs=[self.inputL, self.inputR, self.truth], outputs=self.cost)
-		self.predict = theano.function(inputs=[self.inputL, self.inputR], outputs=self.pred)
+		# Build class functions
+		self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
 		# Compute the gradient of the objective function and cost and prediction
-		self.compute_cost_and_gradient = theano.function(inputs=[self.inputL, self.inputR, self.truth],
-														 outputs=self.gradparams+[self.cost, self.pred])
+		self.compute_cost_and_gradient = theano.function(inputs=[self.inputPL, self.inputPR, 
+																 self.inputNL, self.inputNR],
+														 outputs=self.gradparams+[self.cost, self.scoreP, self.scoreN])
 		# Output function for debugging purpose
-		self.show_hidden = theano.function(inputs=[self.inputL, self.inputR], outputs=self.hidden)
-		self.show_compressed_hidden = theano.function(inputs=[self.inputL, self.inputR], outputs=self.compressed_hidden)
-		self.show_output = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
+		self.show_scores = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
+										   outputs=[self.scoreP, self.scoreN])
+		self.show_hiddens = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
+											outputs=[self.hiddenP, self.hiddenN])
 		if verbose:
-			logger.debug('Architecture of BRNNMatcher built finished, summarized below: ')
+			logger.debug('Architecture of BRNNMatchScorer built finished, summarized below: ')
 			logger.debug('Input dimension: %d' % config.num_input)
 			logger.debug('Hidden dimension of RNN: %d' % config.num_hidden)
 			logger.debug('Hidden dimension of MLP: %d' % config.num_mlp)
-			logger.debug('Number of parameters in the encoder part: %d' % self.num_params_encoder)
-			logger.debug('Number of parameters in the classifier: %d' % self.num_params_classifier)
+			logger.debug('There are 2 BRNNEncoders used in the model.')
 			logger.debug('Total number of parameters in this model: %d' % self.num_params)
-
+			
 	def update_params(self, grads, learn_rate):
 		'''
 		@grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
