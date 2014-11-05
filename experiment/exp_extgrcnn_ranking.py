@@ -367,7 +367,7 @@ try:
         logger.debug('Save current model and parameters...')
         params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
         sio.savemat('ExtGrCNNMatchRanker-{}-params.mat'.format(args.name), params)
-        GrCNNMatcher.save('ExtGrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
+        ExtGrCNNMatchScorer.save('ExtGrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
     # Final total test
@@ -424,4 +424,4 @@ finally:
     params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
     sio.savemat('ExtGrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
-    ExtGrCNNMatcher.save('ExtGrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
+    ExtGrCNNMatchScorer.save('ExtGrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
