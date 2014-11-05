@@ -465,3 +465,101 @@ class BRNNMatcher(object):
 			model = cPickle.load(fin)
 		return model
 
+
+class BRNNMatchScorer(object):
+	'''
+	Bidirectional RNN for text matching as a classification problem.
+	'''
+	def __init__(self, config, verbose=True):
+		# Construct two BRNNEncoders for matching two sentences
+		self.encoderL = BRNNEncoder(config, verbose)
+		self.encoderR = BRNNEncoder(config, verbose)
+		# Link two parts
+		self.params = []
+		self.params += self.encoderL.params
+		self.params += self.encoderR.params
+		# Set up input
+		self.inputL = self.encoderL.input
+		self.inputR = self.encoderR.input
+		# Get output of two BRNNEncoders
+		self.hiddenL = self.encoderL.output
+		self.hiddenR = self.encoderR.output
+		# Activation function
+		self.act = Activation(config.activation)
+		# MLP Component
+		self.hidden = T.concatenate([self.hiddenL, self.hiddenR], axis=0)
+		self.hidden_layer = HiddenLayer(self.hidden, 
+										(4*config.num_hidden, config.num_mlp), 
+										act=Activation(config.hiddenact))
+		self.compressed_hidden = self.hidden_layer.output
+		# Accumulate parameters
+		self.params += self.hidden_layer.params
+		# Dropout parameter
+		srng = T.shared_randomstreams.RandomStreams(config.random_seed)
+		mask = srng.binomial(n=1, p=1-config.dropout, size=self.compressed_hidden.shape)
+		self.compressed_hidden *= T.cast(mask, floatX)
+		# Logistic regression
+		self.logistic_layer = LogisticLayer(self.compressed_hidden, config.num_mlp)
+		self.output = self.logistic_layer.output
+		self.pred = self.logistic_layer.pred
+		# Accumulate parameters
+		self.params += self.logistic_layer.params
+		# Compute the total number of parameters in the model
+		self.num_params_encoder = self.encoderL.num_params + self.encoderR.num_params
+		self.num_params_classifier = 2 * config.num_hidden * config.num_mlp + config.num_mlp + \
+									 config.num_mlp + 1
+		self.num_params = self.num_params_encoder + self.num_params_classifier
+		# Build target function
+		self.truth = T.ivector(name='label')
+		self.cost = self.logistic_layer.NLL_loss(self.truth)
+		# Build computational graph and compute the gradients of the model parameters
+		# with respect to the cost function
+		self.gradparams = T.grad(self.cost, self.params)
+		# Compile theano function
+		self.objective = theano.function(inputs=[self.inputL, self.inputR, self.truth], outputs=self.cost)
+		self.predict = theano.function(inputs=[self.inputL, self.inputR], outputs=self.pred)
+		# Compute the gradient of the objective function and cost and prediction
+		self.compute_cost_and_gradient = theano.function(inputs=[self.inputL, self.inputR, self.truth],
+														 outputs=self.gradparams+[self.cost, self.pred])
+		# Output function for debugging purpose
+		self.show_hidden = theano.function(inputs=[self.inputL, self.inputR], outputs=self.hidden)
+		self.show_compressed_hidden = theano.function(inputs=[self.inputL, self.inputR], outputs=self.compressed_hidden)
+		self.show_output = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
+		if verbose:
+			logger.debug('Architecture of BRNNMatcher built finished, summarized below: ')
+			logger.debug('Input dimension: %d' % config.num_input)
+			logger.debug('Hidden dimension of RNN: %d' % config.num_hidden)
+			logger.debug('Hidden dimension of MLP: %d' % config.num_mlp)
+			logger.debug('Number of parameters in the encoder part: %d' % self.num_params_encoder)
+			logger.debug('Number of parameters in the classifier: %d' % self.num_params_classifier)
+			logger.debug('Total number of parameters in this model: %d' % self.num_params)
+
+	def update_params(self, grads, learn_rate):
+		'''
+		@grads: [np.ndarray]. List of numpy.ndarray for updating the model parameters.
+				They are the corresponding gradients of model parameters.
+		@learn_rate: scalar. Learning rate.
+		'''
+		for param, grad in zip(self.params, grads):
+			p = param.get_value(borrow=True)
+			param.set_value(p - learn_rate * grad, borrow=True)
+
+	@staticmethod
+	def save(fname, model):
+		'''
+		@fname: String. Filename to store the model.
+		@model: BRNNMatcher. An instance of BRNNMatcher to be saved.
+		'''
+		with file(fname, 'wb') as fout:
+			cPickle.dump(model, fout)
+
+	@staticmethod
+	def load(fname):
+		'''
+		@fname: String. Filename to load the model.
+		'''
+		with file(fname, 'rb') as fin:
+			model = cPickle.load(fin)
+		return model
+
+
