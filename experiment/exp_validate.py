@@ -120,9 +120,13 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 # Set print precision
 start_time = time.time()
+configer = GrCNNConfiger('./grCNN_ranker.conf')
 grcnn = GrCNNMatchScorer.load(model_filename)
 end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
+# Output Model size
+for param in grcnn.params:
+    logger.debug('Parameter {}: {}'.format(param.name, param.shape))
 # Define negative/positive sampling ratio
 # Check parameter size
 logger.debug('Number of parameters in this model: {}'.format(grcnn.num_params))
