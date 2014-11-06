@@ -27,7 +27,7 @@ from pprint import pprint
 sys.path.append('../source/')
 
 from rnn import BRNN, RNN
-from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchScorer
+from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchScorer, ExtGrCNNMatchScorer
 from wordvec import WordEmbedding
 from utils import floatX
 from config import GrCNNConfiger, RNNConfiger
@@ -57,7 +57,9 @@ args = parser.parse_args()
 np.random.seed(args.seed)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
 matching_test_filename = '../data/pair_sentence_test.txt'
-model_filename = './GrCNNMatchRanker-RANK-DROPOUT.pkl'
+#model_filename = './GrCNNMatchRanker-RANK-DROPOUT.pkl'
+#model_filename = './brnnMatchRanker-BRNN-DEBUG.pkl'
+model_filename = './ExtGrCNNMatchRanker-EXT-RANK.pkl'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
@@ -121,8 +123,10 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 # Set print precision
 start_time = time.time()
-configer = GrCNNConfiger('./grCNN_ranker.conf')
-grcnn = GrCNNMatchScorer.load(model_filename)
+#configer = GrCNNConfiger('./grCNN_ranker.conf')
+#grcnn = GrCNNMatchScorer.load(model_filename)
+configer = GrCNNConfiger('./extgrcnn.conf')
+grcnn = ExtGrCNNMatchScorer.load(model_filename)
 end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Output Model size
@@ -158,7 +162,7 @@ try:
         logger.debug('ID of Global GrCNN: {}'.format(id(grcnn)))
         for z in xrange(num_processes):
             start_time = time.time()
-            new_worker = GrCNNMatchScorer(configer, verbose=False)
+            new_worker = ExtGrCNNMatchScorer(configer, verbose=False)
             new_worker.deepcopy(grcnn)
             workers.append(new_worker)
             end_time = time.time()
