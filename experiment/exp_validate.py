@@ -143,6 +143,8 @@ end_time = time.time()
 logger.debug('Time used to generate negative training and test pairs: %f seconds.' % (end_time-start_time))
 num_processes = args.cpu
 
+test_size = int(test_size * args.ratio)
+
 try: 
     # Build multiple workers for parallel processing
     workers = []
@@ -201,6 +203,8 @@ try:
             test_predictions.append(score_p >= score_n)
     assert len(test_predictions) == test_size
     test_predictions = np.asarray(test_predictions)
+    logger.debug('Number of test cases: %d' % test_size)
+    logger.debug('Total test costs: %f' % test_costs)
     logger.debug('Total test predictions = {}'.format(test_predictions))
     test_accuracy = np.sum(test_predictions) / float(test_size)
     end_time = time.time()
