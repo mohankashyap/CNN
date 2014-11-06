@@ -47,6 +47,7 @@ device_group.add_argument('-c', '--cpu', type=int, help='Specify the number of c
 device_group.add_argument('-g', '--gpu', action='store_true')
 parser.add_argument('-s', '--seed', help='Random seed.',
                     type=int, default=42)
+parser.add_argument('-d', '--size', help='Batch size.')
 parser.add_argument('-r', '--ratio', help='Ratio of the whole test data to be tested.', 
                     type=float, default=1.0)
 
