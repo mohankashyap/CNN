@@ -47,7 +47,8 @@ device_group.add_argument('-c', '--cpu', type=int, help='Specify the number of c
 device_group.add_argument('-g', '--gpu', action='store_true')
 parser.add_argument('-s', '--seed', help='Random seed.',
                     type=int, default=42)
-parser.add_argument('-d', '--size', help='Batch size.')
+parser.add_argument('-d', '--size', help='Batch size.', 
+                    type=int, default=200)
 parser.add_argument('-r', '--ratio', help='Ratio of the whole test data to be tested.', 
                     type=float, default=1.0)
 
@@ -126,7 +127,7 @@ end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Output Model size
 for param in grcnn.params:
-    logger.debug('Parameter {}: {}'.format(param.name, param.shape))
+    logger.debug('Parameter {}: {}'.format(param.name, param.get_value(borrow=True).shape))
 # Define negative/positive sampling ratio
 # Check parameter size
 logger.debug('Number of parameters in this model: {}'.format(grcnn.num_params))
@@ -149,7 +150,7 @@ logger.debug('Time used to generate negative training and test pairs: %f seconds
 num_processes = args.cpu
 
 test_size = int(test_size * args.ratio)
-
+batch_size = args.size
 try: 
     # Build multiple workers for parallel processing
     workers = []
