@@ -128,7 +128,9 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './brnn_ranking.conf'
 start_time = time.time()
 configer = RNNConfiger(config_filename)
-brnn = BRNNMatchScorer(configer, verbose=True)
+model_filename = 'brnnMatchRanker-BRNN-RANK.pkl'
+#brnn = BRNNMatchScorer(configer, verbose=True)
+brnn = BRNNMatchScorer.load(model_filename)
 end_time = time.time()
 logger.debug('Time used to build/load BRNNMatchScorer: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
