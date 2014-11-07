@@ -52,6 +52,8 @@ parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
                     type=float, default=1.0)
 parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
+parser.add_argument('-m', '--model', help='Model name to use as initializer.',
+                    type=str, default='NONE')
 
 args = parser.parse_args()
 
@@ -128,9 +130,10 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './brnn_ranking.conf'
 start_time = time.time()
 configer = RNNConfiger(config_filename)
-model_filename = 'brnnMatchRanker-BRNN-RANK.pkl'
-#brnn = BRNNMatchScorer(configer, verbose=True)
-brnn = BRNNMatchScorer.load(model_filename)
+if args.model == 'NONE':
+    brnn = BRNNMatchScorer(configer, verbose=True)
+else:
+    brnn = BRNNMatchScorer.load(args.model)
 end_time = time.time()
 logger.debug('Time used to build/load BRNNMatchScorer: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio

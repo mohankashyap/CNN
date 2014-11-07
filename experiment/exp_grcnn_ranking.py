@@ -54,6 +54,8 @@ parser.add_argument('-l', '--rate', help='Learning rate of AdaGrad.',
                     type=float, default=1.0)
 parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
+parser.add_argument('-m', '--model', help='Model name to use as initializer.',
+                    type=str, default='NONE')
 
 args = parser.parse_args()
 
@@ -126,7 +128,10 @@ logger.debug('Time used to build training and test data set: %f seconds.' % (end
 config_filename = './grCNN_ranker.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
-grcnn = GrCNNMatchScorer(configer, verbose=True)
+if args.model == 'NONE':
+    grcnn = GrCNNMatchScorer(configer, verbose=True)
+else:
+    grcnn = GrCNNMatchScorer.load(args.model)
 end_time = time.time()
 logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
