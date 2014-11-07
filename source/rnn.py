@@ -368,7 +368,7 @@ class BRNNEncoder(object):
 		h_backward = T.mean(h_backwards, axis=0)
 		# Concatenate
 		h = T.concatenate([h_forward, h_backward], axis=0)
-		return h
+		return he
 
 
 class BRNNMatcher(object):

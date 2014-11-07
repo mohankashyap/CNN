@@ -4,7 +4,6 @@
 # @Author  : Han Zhao (han.zhao@uwaterloo.ca)
 # @Link    : https://github.com/KeiraZhao
 # @Version : 0.0
-
 import os, sys
 import ConfigParser
 
@@ -198,7 +197,7 @@ class RNNConfiger(object):
 		num_class = self._cf_parser.getint('architectures', 'class')
 		nepoch = self._cf_parser.getint('parameters', 'nepoch')
 		regularization = self._cf_parser.getint('parameters', 'regularization')
-		# L1-norm regularization of the penalty function				
+		# L1-norm regularization of the c''penalty function				
 		lambda1 = self._cf_parser.getfloat('parameters', 'lambda1')
 		# L2-norm regularization of the penalty function
 		lambda2 = self._cf_parser.getfloat('parameters', 'lambda2')
