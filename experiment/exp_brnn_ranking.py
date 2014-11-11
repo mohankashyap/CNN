@@ -413,8 +413,8 @@ try:
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % test_accuracy)
     logger.debug('Test total cost: %f' % test_costs)
-    logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
-    logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
+    # logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
+    # logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:
     logger.debug('!!!Error!!!')
     traceback.print_exc(file=sys.stdout)
@@ -423,6 +423,8 @@ except:
         logger.debug('Quiting all subprocesses...')
         pool.terminate()
 finally:
+    logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
+    logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
     logger.debug('Saving existing model and parameters...')
     params = {param.name : param.get_value(borrow=True) for param in brnn.params}
     sio.savemat('brnnMatchRanker-{}-params.mat'.format(args.name), params)
