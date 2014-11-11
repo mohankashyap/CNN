@@ -125,7 +125,7 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
-config_filename = './grCNN_ranker.conf'
+config_filename = './grCNN_ranker_m.conf'
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
 if args.model == 'NONE':
