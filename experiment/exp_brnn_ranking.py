@@ -54,10 +54,10 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
 parser.add_argument('-m', '--model', help='Model name to use as initializer.',
                     type=str, default='NONE')
-
+parser.add_argument('config', action='store', type=str)
 args = parser.parse_args()
 
-np.random.seed(42)
+np.random.seed(1991)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
 matching_test_filename = '../data/pair_sentence_test.txt'
 #matching_train_filename = '../data/small_pair_train.txt'
@@ -127,7 +127,8 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
-config_filename = './brnn_ranking.conf'
+# config_filename = './brnn_ranking.conf'
+config_filename = args.config
 start_time = time.time()
 configer = RNNConfiger(config_filename)
 if args.model == 'NONE':
