@@ -55,7 +55,6 @@ parser.add_argument('-p', '--dropout', help='Dropout parameter.',
                     type=float, default=0.0)
 parser.add_argument('-r', '--seed', help='Random seed.',
                     type=int, default=42)
-parser.add_argument('config', action='store', type=str)
 args = parser.parse_args()
 
 np.random.seed(args.seed)
