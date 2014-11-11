@@ -103,7 +103,7 @@ for i, (psent, qsent) in enumerate(train_pairs_txt):
 
     train_pairs_set.append((pvectors, qvectors))
 
-for i, (psent, qsent) in enumerate(test_pairs_txt):
+for i, (psent, qsent, nqsent) in enumerate(test_pairs_txt):
     pwords = psent.split()
     pwords = [pword.lower() for pword in pwords]
     pvectors = np.zeros((len(pwords)+2, edim), dtype=floatX)
