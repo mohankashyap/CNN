@@ -58,8 +58,8 @@ parser.add_argument('config', action='store', type=str)
 args = parser.parse_args()
 
 np.random.seed(1991)
-matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test_hard.txt'
+matching_train_filename = '../data/test_pair_all_sentence_train.txt'
+matching_test_filename = '../data/test_pair_sentence_test_hard.txt'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
