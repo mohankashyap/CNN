@@ -55,11 +55,12 @@ parser.add_argument('-p', '--dropout', help='Dropout parameter.',
                     type=float, default=0.0)
 parser.add_argument('-r', '--seed', help='Random seed.',
                     type=int, default=42)
+parser.add_argument('config', action='store', type=str)
 args = parser.parse_args()
 
 np.random.seed(args.seed)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
+matching_test_filename = '../data/pair_sentence_test_hard.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -69,8 +70,8 @@ with file(matching_train_filename, 'r') as fin:
         train_pairs_txt.append((p, q))
 with file(matching_test_filename, 'r') as fin:
     for line in fin:
-        p, q = line.split('|||')
-        test_pairs_txt.append((p, q))
+        p, q, nq = line.split('|||')
+        test_pairs_txt.append((p, q, nq))
 end_time = time.time()
 logger.debug('Finished loading training and test data set...')
 logger.debug('Time used to load training and test pairs: %f seconds.' % (end_time-start_time))
@@ -116,7 +117,13 @@ for i, (psent, qsent) in enumerate(test_pairs_txt):
     qvectors[0, :], qvectors[-1, :] = blank_token, blank_token
     qvectors[1:-1, :] = np.asarray([word_embedding.wordvec(qword) for qword in qwords], dtype=floatX)
 
-    test_pairs_set.append((pvectors, qvectors))
+    nqwords = nqsent.split()
+    nqwords = [nqword.lower() for nqword in nqwords]
+    nqvectors = np.zeros((len(nqwords)+2, edim), dtype=floatX)
+    nqvectors[0, :], nqvectors[-1, :] = blank_token, blank_token
+    nqvectors[1:-1, :] = np.asarray([word_embedding.wordvec(nqword) for nqword in nqwords], dtype=floatX)
+
+    test_pairs_set.append((pvectors, qvectors, nqvectors))
 end_time = time.time()
 logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
@@ -209,8 +216,6 @@ batch_size = args.size
 fudge_factor = 1e-6
 logger.debug('MLPRanker.params: {}'.format(ranker.params))
 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in ranker.params]
-initial_params = {param.name : param.get_value(borrow=True) for param in ranker.params}
-sio.savemat('ranker_ranker_initial.mat', initial_params)
 # Record the highest training and test accuracy during training process
 highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 # Check parameter size
@@ -219,17 +224,11 @@ for param in hist_grads:
 # Fixing training and test pairs
 start_time = time.time()
 train_neg_index = range(train_size)
-test_neg_index = range(test_size)
 def train_rand(idx):
     nidx = idx
     while nidx == idx: nidx = np.random.randint(0, train_size)
     return nidx
-def test_rand(idx):
-    nidx = idx
-    while nidx == idx: nidx = np.random.randint(0, test_size)
-    return nidx
 train_neg_index = map(train_rand, train_neg_index)
-test_neg_index = map(test_rand, test_neg_index)
 # Build final training and test matrices
 trainL = np.zeros((train_size, edim), dtype=floatX)
 trainR = np.zeros((train_size, edim), dtype=floatX)
@@ -248,8 +247,7 @@ for i in xrange(train_size):
 for i in xrange(test_size):
     testL[i, :] = np.mean(test_pairs_set[i][0], axis=0)
     testR[i, :] = np.mean(test_pairs_set[i][1], axis=0)
-    ni = test_neg_index[i]
-    testNR[i, :] = np.mean(test_pairs_set[ni][1], axis=0)
+    testNR[i, :] = np.mean(test_pairs_set[i][2], axis=0)
 end_time = time.time()
 logger.debug('Time used to generate negative training and test pairs: %f seconds.' % (end_time-start_time))
 
@@ -316,9 +314,6 @@ try:
         logger.debug('Test accuracy: %f' % test_accuracy)
         logger.debug('Test total cost: %f' % total_cost)
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
-        # Save model parameters
-        params = {param.name : param.get_value(borrow=True) for param in ranker.params}
-        sio.savemat('rankerMatchRanker-{}-params.mat'.format(args.name), params)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
     # Final total test
@@ -334,15 +329,13 @@ try:
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % test_accuracy)
     logger.debug('Test total cost: %f' % total_cost)
-    logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
-    logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:
     logger.debug('!!!Error!!!')
     traceback.print_exc(file=sys.stdout)
     logger.debug('-' * 60)
 finally:            
+    logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
+    logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
     logger.debug('Saving existing model and parameters...')
-    params = {param.name : param.get_value(borrow=True) for param in ranker.params}
-    sio.savemat('rankerMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: rankerMatchRanker-{}.pkl.'.format(args.name))
     MLPRanker.save('rankerMatchRanker-{}.pkl'.format(args.name), ranker)
