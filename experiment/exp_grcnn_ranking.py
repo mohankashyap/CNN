@@ -56,6 +56,7 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
                     type=str, default=default_name)
 parser.add_argument('-m', '--model', help='Model name to use as initializer.',
                     type=str, default='NONE')
+parser.add_argument('config', action='store', type=str)
 
 args = parser.parse_args()
 
@@ -125,7 +126,8 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
-config_filename = './grCNN_ranker_m.conf'
+# config_filename = './grCNN_ranker.conf'
+config_filename = args.config
 start_time = time.time()
 configer = GrCNNConfiger(config_filename)
 if args.model == 'NONE':
