@@ -62,7 +62,7 @@ args = parser.parse_args()
 
 np.random.seed(1991)
 matching_train_filename = '../data/pair_all_sentence_train.txt'
-matching_test_filename = '../data/pair_sentence_test.txt'
+matching_test_filename = '../data/pair_sentence_test_hard.txt'
 
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
@@ -73,8 +73,8 @@ with file(matching_train_filename, 'r') as fin:
         train_pairs_txt.append((p, q))
 with file(matching_test_filename, 'r') as fin:
     for line in fin:
-        p, q = line.split('|||')
-        test_pairs_txt.append((p, q))
+        p, q, nq = line.split('|||')
+        test_pairs_txt.append((p, q, nq))
 end_time = time.time()
 logger.debug('Finished loading training and test data set...')
 logger.debug('Time used to load training and test pairs: %f seconds.' % (end_time-start_time))
@@ -107,7 +107,7 @@ for i, (psent, qsent) in enumerate(train_pairs_txt):
 
     train_pairs_set.append((pvectors, qvectors))
 
-for i, (psent, qsent) in enumerate(test_pairs_txt):
+for i, (psent, qsent, nqsent) in enumerate(test_pairs_txt):
     pwords = psent.split()
     pwords = [pword.lower() for pword in pwords]
     pvectors = np.zeros((len(pwords)+2, edim), dtype=floatX)
@@ -120,7 +120,13 @@ for i, (psent, qsent) in enumerate(test_pairs_txt):
     qvectors[0, :], qvectors[-1, :] = blank_token, blank_token
     qvectors[1:-1, :] = np.asarray([word_embedding.wordvec(qword) for qword in qwords], dtype=floatX)
 
-    test_pairs_set.append((pvectors, qvectors))
+    nqwords = nqsent.split()
+    nqwords = [nqword.lower() for nqword in nqwords]
+    nqvectors = np.zeros((len(nqwords)+2, edim), dtype=floatX)
+    nqvectors[0, :], nqvectors[-1, :] = blank_token, blank_token
+    nqvectors[1:-1, :] = np.asarray([word_embedding.wordvec(nqword) for nqword in nqwords], dtype=floatX)
+
+    test_pairs_set.append((pvectors, qvectors, nqvectors))
 end_time = time.time()
 logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
@@ -144,8 +150,6 @@ batch_size = args.size
 fudge_factor = 1e-6
 logger.debug('GrCNNMatchRanker.params: {}'.format(grcnn.params))
 hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
-initial_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
-sio.savemat('grcnn_ranker_initial.mat', initial_params)
 # Record the highest training and test accuracy during training process
 highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 # Check parameter size
@@ -154,18 +158,11 @@ for param in hist_grads:
 # Fixing training and test pairs
 start_time = time.time()
 train_neg_index = range(train_size)
-test_neg_index = range(test_size)
 def train_rand(idx):
     nidx = idx
     while nidx == idx: nidx = np.random.randint(0, train_size)
     return nidx
-def test_rand(idx):
-    nidx = idx
-    while nidx == idx: nidx = np.random.randint(0, test_size)
-    return nidx
 train_neg_index = map(train_rand, train_neg_index)
-test_neg_index = map(test_rand, test_neg_index)
-
 end_time = time.time()
 logger.debug('Time used to generate negative training and test pairs: %f seconds.' % (end_time-start_time))
 num_processes = args.cpu
@@ -199,9 +196,7 @@ try:
     def parallel_predict(start_idx, end_idx, worker_id):
         costs, preds = 0.0, []
         for j in xrange(start_idx, end_idx):
-            sentL, p_sentR = test_pairs_set[j]
-            nj = test_neg_index[j]
-            n_sentR = test_pairs_set[nj][1]
+            sentL, p_sentR, n_sentR = test_pairs_set[j]
             score_p, score_n = workers[worker_id].show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: costs += 1-score_p+score_n
@@ -325,9 +320,7 @@ try:
         test_costs, test_predictions = 0.0, []
         if args.gpu:
             for j in xrange(test_size):
-                sentL, p_sentR = test_pairs_set[j]
-                nj = test_neg_index[j]
-                n_sentR = test_pairs_set[nj][1]
+                sentL, p_sentR, n_sentR = test_pairs_set[j]
                 score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
@@ -353,9 +346,7 @@ try:
                     test_predictions += result[1]
             if t_num_batch * batch_size < test_size:
                 for j in xrange(t_num_batch * batch_size, test_size):
-                    sentL, p_sentR = test_pairs_set[j]
-                    nj = test_neg_index[j]
-                    n_sentR = test_pairs_set[nj][1]
+                    sentL, p_sentR, n_sentR = test_pairs_set[j]
                     score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
                     score_p, score_n = score_p[0], score_n[0]
                     if score_p < 1+score_n: test_costs += 1-score_p+score_n
@@ -368,8 +359,6 @@ try:
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
         # Save the model
         logger.debug('Save current model and parameters...')
-        params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
-        sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
         GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
@@ -398,9 +387,7 @@ try:
     if t_num_batch * batch_size < test_size:
         logger.debug('The rest of the test instances are processed sequentially...')
         for j in xrange(t_num_batch * batch_size, test_size):
-            sentL, p_sentR = test_pairs_set[j]
-            nj = test_neg_index[j]
-            n_sentR = test_pairs_set[nj][1]
+            sentL, p_sentR, n_sentR = test_pairs_set[j]
             score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: test_costs += 1-score_p+score_n
@@ -424,7 +411,5 @@ finally:
     logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
     logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
     logger.debug('Saving existing model and parameters...')
-    params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
-    sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
     logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
     GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
