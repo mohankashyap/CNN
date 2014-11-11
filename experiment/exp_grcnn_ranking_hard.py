@@ -26,10 +26,12 @@ from pprint import pprint
 
 sys.path.append('../source/')
 
-from rnn import BRNN, RNN, BRNNMatchScorer
+from rnn import BRNN, RNN
+from grcnn import GrCNN, GrCNNMatcher, GrCNNMatchScorer
 from wordvec import WordEmbedding
+from logistic import SoftmaxLayer, LogisticLayer
 from utils import floatX
-from config import RNNConfiger
+from config import GrCNNConfiger
 
 charas = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 default_name = ''.join([charas[np.random.randint(0, len(charas))] for _ in xrange(5)])
@@ -55,6 +57,7 @@ parser.add_argument('-n', '--name', help='Name used to save the model.',
 parser.add_argument('-m', '--model', help='Model name to use as initializer.',
                     type=str, default='NONE')
 parser.add_argument('config', action='store', type=str)
+
 args = parser.parse_args()
 
 np.random.seed(1991)
@@ -123,26 +126,26 @@ logger.debug('Training and test data sets building finished...')
 logger.debug('Time used to build training and test data set: %f seconds.' % (end_time-start_time))
 # Set print precision
 # np.set_printoptions(threshold=np.nan)
-# config_filename = './brnn_ranking.conf'
+# config_filename = './grCNN_ranker.conf'
 config_filename = args.config
 start_time = time.time()
-configer = RNNConfiger(config_filename)
+configer = GrCNNConfiger(config_filename)
 if args.model == 'NONE':
-    brnn = BRNNMatchScorer(configer, verbose=True)
+    grcnn = GrCNNMatchScorer(configer, verbose=True)
 else:
-    brnn = BRNNMatchScorer.load(args.model)
+    grcnn = GrCNNMatchScorer.load(args.model)
 end_time = time.time()
-logger.debug('Time used to build/load BRNNMatchScorer: %f seconds.' % (end_time-start_time))
+logger.debug('Time used to build/load GrCNNMatchRanker: %f seconds.' % (end_time-start_time))
 # Define negative/positive sampling ratio
 # Begin training
 # Using AdaGrad learning algorithm
 learn_rate = args.rate
 batch_size = args.size
 fudge_factor = 1e-6
-logger.debug('BRNNMatchScorer.params: {}'.format(brnn.params))
-hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
-initial_params = {param.name : param.get_value(borrow=True) for param in brnn.params}
-sio.savemat('brnn_ranker_initial.mat', initial_params)
+logger.debug('GrCNNMatchRanker.params: {}'.format(grcnn.params))
+hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+initial_params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+sio.savemat('grcnn_ranker_initial.mat', initial_params)
 # Record the highest training and test accuracy during training process
 highest_train_accuracy, highest_test_accuracy = 0.0, 0.0
 # Check parameter size
@@ -171,11 +174,11 @@ try:
     # Build multiple workers for parallel processing
     workers = []
     if args.cpu:
-        logger.debug('ID of Global BRNNMatchScorer: {}'.format(id(brnn)))
+        logger.debug('ID of Global GrCNN: {}'.format(id(grcnn)))
         for z in xrange(num_processes):
             start_time = time.time()
-            new_worker = BRNNMatchScorer(configer, verbose=False)
-            new_worker.deepcopy(brnn)
+            new_worker = GrCNNMatchScorer(configer, verbose=False)
+            new_worker.deepcopy(grcnn)
             workers.append(new_worker)
             end_time = time.time()
             logger.debug('Time used to build %d th worker: %f seconds.' % (z, end_time-start_time))
@@ -218,16 +221,16 @@ try:
         logger.debug('Total number of batches: %d' % num_batch)
         if args.gpu:
             # Start training
-            total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
-            hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
+            total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+            hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
             # Using GPU computation
             for j in xrange(train_size):
                 if (j+1) % 10000 == 0: logger.debug('%8d @ %4d epoch' % (j+1, i))
                 sentL, p_sentR = train_pairs_set[j]
                 nj = train_neg_index[j]
                 n_sentR = train_pairs_set[nj][1]
-                # Call brnnMatchRanker
-                r = brnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
+                # Call GrCNNMatchRanker
+                r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                 inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
                 # Accumulate results
                 for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
@@ -241,9 +244,9 @@ try:
                         tot_grad /= batch_size
                         tot_grad /= fudge_factor + np.sqrt(hist_grad)
                     # Check total grads
-                    brnn.update_params(total_grads, learn_rate)
-                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
-                    hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
+                    grcnn.update_params(total_grads, learn_rate)
+                    total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                    hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
         else:
             # Simulate the Map-Reduce strategy to parallelize the training process
             # Using Parallel CPU computation
@@ -263,8 +266,8 @@ try:
                 pool.join()
                 # Accumulate results
                 results = [result.get() for result in results]
-                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
-                hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
+                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 # Map-Reduce
                 for result in results:
                     grad, cost, pred = result[0], result[1], result[2]
@@ -279,20 +282,20 @@ try:
                     tot_grad /= batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
-                brnn.update_params(total_grads, learn_rate)
+                grcnn.update_params(total_grads, learn_rate)
                 # Reduce
-                for worker in workers: worker.deepcopy(brnn)
+                for worker in workers: worker.deepcopy(grcnn)
             # Update all the rests
             if num_batch * batch_size < train_size:
                 logger.debug('There are %d training instances need to be processed sequentially.' % (train_size-num_batch*batch_size))
                 # Accumulate results
-                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
-                hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in brnn.params]
+                total_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
+                hist_grads = [np.zeros(param.get_value(borrow=True).shape, dtype=floatX) for param in grcnn.params]
                 for j in xrange(num_batch * batch_size, train_size):
                     sentL, p_sentR = train_pairs_set[j]
                     nj = train_neg_index[j]
                     n_sentR = train_pairs_set[nj][1]
-                    r = brnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
+                    r = grcnn.compute_cost_and_gradient(sentL, p_sentR, sentL, n_sentR) 
                     inst_grads, cost, score_p, score_n = r[:-3], r[-3], r[-2][0], r[-1][0]
                     for tot_grad, hist_grad, inst_grad in zip(total_grads, hist_grads, inst_grads):
                         tot_grad += inst_grad
@@ -304,9 +307,9 @@ try:
                     tot_grad /= train_size - num_batch*batch_size
                     tot_grad /= fudge_factor + np.sqrt(hist_grad)
                 # Compute the norm of gradients 
-                brnn.update_params(total_grads, learn_rate)
+                grcnn.update_params(total_grads, learn_rate)
                 # Reduce
-                for worker in workers: worker.deepcopy(brnn)
+                for worker in workers: worker.deepcopy(grcnn)
         # Compute training error
         assert len(total_predictions) == train_size
         total_predictions = np.asarray(total_predictions)
@@ -325,7 +328,7 @@ try:
                 sentL, p_sentR = test_pairs_set[j]
                 nj = test_neg_index[j]
                 n_sentR = test_pairs_set[nj][1]
-                score_p, score_n = brnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
                 score_p, score_n = score_p[0], score_n[0]
                 if score_p < 1+score_n: test_costs += 1-score_p+score_n
                 test_predictions.append(score_p >= score_n)
@@ -353,7 +356,7 @@ try:
                     sentL, p_sentR = test_pairs_set[j]
                     nj = test_neg_index[j]
                     n_sentR = test_pairs_set[nj][1]
-                    score_p, score_n = brnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+                    score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
                     score_p, score_n = score_p[0], score_n[0]
                     if score_p < 1+score_n: test_costs += 1-score_p+score_n
                     test_predictions.append(score_p >= score_n)
@@ -365,9 +368,9 @@ try:
         if test_accuracy > highest_test_accuracy: highest_test_accuracy = test_accuracy
         # Save the model
         logger.debug('Save current model and parameters...')
-        params = {param.name : param.get_value(borrow=True) for param in brnn.params}
-        sio.savemat('brnnMatchRanker-{}-params.mat'.format(args.name), params)
-        BRNNMatchScorer.save('brnnMatchRanker-{}.pkl'.format(args.name), brnn)
+        params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+        sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
+        GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
     end_time = time.time()
     logger.debug('Time used for training: %f minutes.' % ((end_time-start_time)/60))
     # Final total test
@@ -398,7 +401,7 @@ try:
             sentL, p_sentR = test_pairs_set[j]
             nj = test_neg_index[j]
             n_sentR = test_pairs_set[nj][1]
-            score_p, score_n = brnn.show_scores(sentL, p_sentR, sentL, n_sentR)
+            score_p, score_n = grcnn.show_scores(sentL, p_sentR, sentL, n_sentR)
             score_p, score_n = score_p[0], score_n[0]
             if score_p < 1+score_n: test_costs += 1-score_p+score_n
             test_predictions.append(score_p >= score_n)
@@ -410,8 +413,6 @@ try:
     logger.debug('Time used for testing: %f seconds.' % (end_time-start_time))
     logger.debug('Test accuracy: %f' % test_accuracy)
     logger.debug('Test total cost: %f' % test_costs)
-    # logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
-    # logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
 except:
     logger.debug('!!!Error!!!')
     traceback.print_exc(file=sys.stdout)
@@ -423,7 +424,7 @@ finally:
     logger.debug('Highest Training Accuracy: %f' % highest_train_accuracy)
     logger.debug('Highest Test Accuracy: %f' % highest_test_accuracy)
     logger.debug('Saving existing model and parameters...')
-    params = {param.name : param.get_value(borrow=True) for param in brnn.params}
-    sio.savemat('brnnMatchRanker-{}-params.mat'.format(args.name), params)
-    logger.debug('Saving the model: brnnMatchRanker-{}.pkl.'.format(args.name))
-    BRNNMatchScorer.save('brnnMatchRanker-{}.pkl'.format(args.name), brnn)
+    params = {param.name : param.get_value(borrow=True) for param in grcnn.params}
+    sio.savemat('GrCNNMatchRanker-{}-params.mat'.format(args.name), params)
+    logger.debug('Saving the model: GrCNNMatchRanker-{}.pkl.'.format(args.name))
+    GrCNNMatcher.save('GrCNNMatchRanker-{}.pkl'.format(args.name), grcnn)
