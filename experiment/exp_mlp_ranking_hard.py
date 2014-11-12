@@ -58,8 +58,8 @@ parser.add_argument('-r', '--seed', help='Random seed.',
 args = parser.parse_args()
 
 np.random.seed(args.seed)
-matching_train_filename = '../data/test_pair_all_sentence_train.txt'
-matching_test_filename = '../data/test_pair_sentence_test_hard.txt'
+matching_train_filename = '../data/pair_all_sentence_train.txt'
+matching_test_filename = '../data/pair_sentence_test_hard.txt'
 train_pairs_txt, test_pairs_txt = [], []
 # Loading training and test pairs
 start_time = time.time()
@@ -153,19 +153,27 @@ class MLPRanker(object):
         self.hidden = self.hidden_layer.output
         self.hiddenP = self.hidden_layer.encode(self.inputP)
         self.hiddenN = self.hidden_layer.encode(self.inputN)
-        # Dropout parameter
-        #srng = T.shared_randomstreams.RandomStreams(args.seed)
-        #mask = srng.binomial(n=1, p=1-args.dropout, size=self.hidden.shape)
-        #maskP = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenP.shape)
-        #maskN = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenN.shape)
-        #self.hidden *= T.cast(mask, floatX)
-        #self.hiddenP *= T.cast(maskP, floatX)
-        #self.hiddenN *= T.cast(maskN, floatX)
+        # Dropout parameter - test
+        self.thidden = (1-args.dropout) * self.hidden
+        self.thiddenP = (1-args.dropout) * self.hiddenP
+        self.thiddenN = (1-args.dropout) * self.hiddenN
+        # Dropout parameter - train
+        srng = T.shared_randomstreams.RandomStreams(args.seed)
+        mask = srng.binomial(n=1, p=1-args.dropout, size=self.hidden.shape)
+        maskP = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenP.shape)
+        maskN = srng.binomial(n=1, p=1-args.dropout, size=self.hiddenN.shape)
+        self.hidden *= T.cast(mask, floatX)
+        self.hiddenP *= T.cast(maskP, floatX)
+        self.hiddenN *= T.cast(maskN, floatX)
         # Build linear output layer
         self.score_layer = ScoreLayer(self.hidden, args.hidden)
         self.output = self.score_layer.output
         self.scoreP = self.score_layer.encode(self.hiddenP)
         self.scoreN = self.score_layer.encode(self.hiddenN)
+        # Build for test
+        self.toutput = self.score_layer.encode(self.thidden)
+        self.tscoreP = self.score_layer.encode(self.thiddenP)
+        self.tscoreN = self.score_layer.encode(self.thiddenN)
         # Stack all the parameters
         self.params = []
         self.params += self.hidden_layer.params
@@ -177,11 +185,11 @@ class MLPRanker(object):
         # Count the total number of parameters in this model
         self.num_params = edim * args.hidden + args.hidden + args.hidden + 1
         # Build class method
-        self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.output)
+        self.score = theano.function(inputs=[self.inputL, self.inputR], outputs=self.toutput)
         self.compute_cost_and_gradient = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR],
                                                          outputs=self.gradparams+[self.cost, self.scoreP, self.scoreN])
         self.show_scores = theano.function(inputs=[self.inputPL, self.inputPR, self.inputNL, self.inputNR], 
-                                           outputs=[self.scoreP, self.scoreN])
+                                           outputs=[self.tscoreP, self.tscoreN])
         if verbose:
             logger.debug('Architecture of MLP Ranker built finished, summarized below: ')
             logger.debug('Input dimension: %d' % edim)
@@ -250,7 +258,7 @@ for i in xrange(test_size):
 end_time = time.time()
 logger.debug('Time used to generate negative training and test pairs: %f seconds.' % (end_time-start_time))
 
-nepoch = 50
+nepoch = 500
 try: 
     start_time = time.time()
     num_batch = train_size / batch_size
